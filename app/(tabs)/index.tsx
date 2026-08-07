@@ -1,98 +1,189 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+type Track = {
+  trackId: number;
+  trackName: string;
+  artistName: string;
+  artworkUrl100: string;
+  previewUrl: string;
+};
 
-export default function HomeScreen() {
+export default function SearchScreen() {
+  const [query, setQuery] = useState("");
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [playingId, setPlayingId] = useState<number | null>(null);
+
+  // One reusable audio player. The `null` source keeps this instance stable for
+  // the life of the screen; tracks are swapped in with player.replace().
+  const player = useAudioPlayer(null, { updateInterval: 250 });
+
+  // The track we intend to be hearing, or null if the user deliberately paused.
+  const wantedTrackRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+      shouldRouteThroughEarpiece: false,
+      // Anything but 'mixWithOthers' — that value makes the Android module skip
+      // requesting audio focus entirely.
+      interruptionMode: "duckOthers",
+    }).catch((err) => console.error("setAudioModeAsync failed:", err));
+  }, []);
+
+  useEffect(() => {
+    const sub = player.addListener("playbackStatusUpdate", (status) => {
+      if (status.didJustFinish) {
+        wantedTrackRef.current = null;
+        setPlayingId(null);
+        return;
+      }
+
+      // prepare() runs asynchronously, so a play() issued at tap time can land
+      // before the remote source is READY. Re-assert it once loading finishes.
+      if (
+        wantedTrackRef.current !== null &&
+        status.isLoaded &&
+        !status.playing
+      ) {
+        player.play();
+      }
+    });
+
+    return () => sub.remove();
+  }, [player]);
+
+  async function search() {
+    if (!query.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=25`,
+      );
+      const data = await res.json();
+      setTracks(data.results.filter((t: Track) => t.previewUrl));
+    } catch (err) {
+      console.error("Search failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const togglePlay = useCallback(
+    (track: Track) => {
+      if (playingId === track.trackId) {
+        wantedTrackRef.current = null;
+        player.pause();
+        setPlayingId(null);
+        return;
+      }
+
+      // Some iTunes results still carry http:// preview URLs, which Android
+      // drops as cleartext traffic without surfacing an error.
+      const uri = track.previewUrl.replace(/^http:\/\//i, "https://");
+
+      wantedTrackRef.current = track.trackId;
+      player.replace({ uri });
+      player.play();
+      setPlayingId(track.trackId);
+    },
+    [player, playingId],
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={styles.container}>
+      <Text style={styles.title}>Luna Music</Text>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.input}
+          placeholder="Search songs or artists..."
+          value={query}
+          onChangeText={setQuery}
+          onSubmitEditing={search}
+          returnKeyType="search"
+        />
+        <Pressable style={styles.button} onPress={search}>
+          <Text style={styles.buttonText}>Search</Text>
+        </Pressable>
+      </View>
+
+      {loading && <ActivityIndicator size="large" style={{ marginTop: 20 }} />}
+
+      <FlatList
+        data={tracks}
+        keyExtractor={(item) => String(item.trackId)}
+        renderItem={({ item }) => (
+          <Pressable style={styles.row} onPress={() => togglePlay(item)}>
+            <Image source={{ uri: item.artworkUrl100 }} style={styles.art} />
+            <View style={styles.info}>
+              <Text style={styles.trackName} numberOfLines={1}>
+                {item.trackName}
+              </Text>
+              <Text style={styles.artist} numberOfLines={1}>
+                {item.artistName}
+              </Text>
+            </View>
+            <Text style={styles.playIcon}>
+              {playingId === item.trackId ? "❚❚" : "▶"}
+            </Text>
+          </Pressable>
+        )}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    paddingTop: 60,
+    paddingHorizontal: 16,
+    backgroundColor: "#fff",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    marginBottom: 16,
+    color: "#4C1D95",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  searchRow: { flexDirection: "row", gap: 8 },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 44,
   },
+  button: {
+    backgroundColor: "#6D28D9",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+  },
+  buttonText: { color: "#fff", fontWeight: "600" },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    gap: 12,
+  },
+  art: { width: 50, height: 50, borderRadius: 6, backgroundColor: "#eee" },
+  info: { flex: 1 },
+  trackName: { fontSize: 15, fontWeight: "600", color: "#1F2937" },
+  artist: { fontSize: 13, color: "#6B7280" },
+  playIcon: { fontSize: 18, color: "#6D28D9", paddingHorizontal: 8 },
 });
