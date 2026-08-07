@@ -27,7 +27,6 @@ export default function SearchScreen() {
 
   const player = useAudioPlayer(null, { updateInterval: 250 });
 
-  // The track we intend to be hearing, or null if the user deliberately paused.
   const wantedTrackRef = useRef<number | null>(null);
 
   useEffect(() => {
