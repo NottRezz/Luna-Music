@@ -25,8 +25,6 @@ export default function SearchScreen() {
   const [loading, setLoading] = useState(false);
   const [playingId, setPlayingId] = useState<number | null>(null);
 
-  // One reusable audio player. The `null` source keeps this instance stable for
-  // the life of the screen; tracks are swapped in with player.replace().
   const player = useAudioPlayer(null, { updateInterval: 250 });
 
   // The track we intend to be hearing, or null if the user deliberately paused.
@@ -37,8 +35,7 @@ export default function SearchScreen() {
       playsInSilentMode: true,
       shouldPlayInBackground: false,
       shouldRouteThroughEarpiece: false,
-      // Anything but 'mixWithOthers' — that value makes the Android module skip
-      // requesting audio focus entirely.
+
       interruptionMode: "duckOthers",
     }).catch((err) => console.error("setAudioModeAsync failed:", err));
   }, []);
@@ -51,8 +48,6 @@ export default function SearchScreen() {
         return;
       }
 
-      // prepare() runs asynchronously, so a play() issued at tap time can land
-      // before the remote source is READY. Re-assert it once loading finishes.
       if (
         wantedTrackRef.current !== null &&
         status.isLoaded &&
@@ -90,8 +85,6 @@ export default function SearchScreen() {
         return;
       }
 
-      // Some iTunes results still carry http:// preview URLs, which Android
-      // drops as cleartext traffic without surfacing an error.
       const uri = track.previewUrl.replace(/^http:\/\//i, "https://");
 
       wantedTrackRef.current = track.trackId;
