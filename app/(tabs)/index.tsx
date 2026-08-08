@@ -1,181 +1,289 @@
-import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+/**
+ * Search — `#view-search` in design/mockup/index.html.
+ *
+ * The browse sections are the mockup's, verbatim. The field itself is live:
+ * submitting a query swaps the browse stack for real iTunes results.
+ */
 
-type Track = {
-  trackId: number;
-  trackName: string;
-  artistName: string;
-  artworkUrl100: string;
-  previewUrl: string;
-};
+import { useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+
+import { Art } from '@/components/aero/art';
+import {
+  AeroButton,
+  Card,
+  Chip,
+  Field,
+  Grad,
+  Press,
+  SectionLabel,
+} from '@/components/aero/primitives';
+import { QueueRow, TrackRow } from '@/components/aero/track-row';
+import { Screen } from '@/components/screen';
+import { C, F, G, R, SCROLL, SH, s, textShadow } from '@/constants/aero';
+import { MOODS } from '@/constants/seed';
+import { useLibrary } from '@/providers/library';
+import { searchItunes, usePlayer } from '@/providers/player';
+import { useUI } from '@/providers/ui';
+import type { Track } from '@/types/music';
 
 export default function SearchScreen() {
-  const [query, setQuery] = useState("");
-  const [tracks, setTracks] = useState<Track[]>([]);
+  const router = useRouter();
+  const { playlists, recents, history, statsOf, rememberSearch, clearRecents, setActivePlaylist } =
+    useLibrary();
+  const { play, track: current, playing } = usePlayer();
+  const { promptAddToPlaylist } = useUI();
+
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Track[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [playingId, setPlayingId] = useState<number | null>(null);
+  /** Discards a slow response once a newer search has been submitted. */
+  const searchToken = useRef(0);
 
-  const player = useAudioPlayer(null, { updateInterval: 250 });
-
-  const wantedTrackRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    setAudioModeAsync({
-      playsInSilentMode: true,
-      shouldPlayInBackground: false,
-      shouldRouteThroughEarpiece: false,
-
-      interruptionMode: "duckOthers",
-    }).catch((err) => console.error("setAudioModeAsync failed:", err));
-  }, []);
-
-  useEffect(() => {
-    const sub = player.addListener("playbackStatusUpdate", (status) => {
-      if (status.didJustFinish) {
-        wantedTrackRef.current = null;
-        setPlayingId(null);
-        return;
+  const run = useCallback(
+    async (term: string) => {
+      const t = term.trim();
+      if (!t) return;
+      const token = ++searchToken.current;
+      setQuery(t);
+      setLoading(true);
+      try {
+        const found = await searchItunes(t);
+        if (token !== searchToken.current) return;
+        setResults(found);
+        rememberSearch(t);
+      } catch (err) {
+        if (token !== searchToken.current) return;
+        console.warn('Search failed:', err);
+        setResults([]);
+      } finally {
+        if (token === searchToken.current) setLoading(false);
       }
-
-      if (
-        wantedTrackRef.current !== null &&
-        status.isLoaded &&
-        !status.playing
-      ) {
-        player.play();
-      }
-    });
-
-    return () => sub.remove();
-  }, [player]);
-
-  async function search() {
-    if (!query.trim()) return;
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=25`,
-      );
-      const data = await res.json();
-      setTracks(data.results.filter((t: Track) => t.previewUrl));
-    } catch (err) {
-      console.error("Search failed:", err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const togglePlay = useCallback(
-    (track: Track) => {
-      if (playingId === track.trackId) {
-        wantedTrackRef.current = null;
-        player.pause();
-        setPlayingId(null);
-        return;
-      }
-
-      const uri = track.previewUrl.replace(/^http:\/\//i, "https://");
-
-      wantedTrackRef.current = track.trackId;
-      player.replace({ uri });
-      player.play();
-      setPlayingId(track.trackId);
     },
-    [player, playingId],
+    [rememberSearch],
   );
+
+  const clear = () => {
+    // Also strands any in-flight search, which would otherwise repopulate the
+    // list the user just dismissed.
+    searchToken.current++;
+    setQuery('');
+    setResults(null);
+    setLoading(false);
+  };
+
+  const openPlaylist = (id: string) => {
+    setActivePlaylist(id);
+    router.navigate('/playlist');
+  };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Luna Music</Text>
-
-      <View style={styles.searchRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="Search songs or artists..."
+    <Screen>
+      {/* `.search-row` */}
+      <View style={{ flexDirection: 'row', gap: s(8), alignItems: 'center' }}>
+        <Field
+          placeholder="Songs, artists, vibes…"
           value={query}
           onChangeText={setQuery}
-          onSubmitEditing={search}
+          onSubmitEditing={() => run(query)}
           returnKeyType="search"
+          // No clear affordance here: the mockup hides the native one
+          // (`::-webkit-search-cancel-button`). Clearing lives on the results
+          // header instead.
         />
-        <Pressable style={styles.button} onPress={search}>
-          <Text style={styles.buttonText}>Search</Text>
-        </Pressable>
+        <Press onPress={() => run(query)}>
+          <Grad
+            g={G.btnGreen}
+            style={{
+              width: s(44),
+              height: s(40),
+              borderRadius: s(11),
+              alignItems: 'center',
+              justifyContent: 'center',
+              ...SH.btn,
+            }}>
+            <Text
+              style={{
+                fontFamily: F.black,
+                fontSize: s(11),
+                letterSpacing: s(11) * 0.06,
+                color: '#fff',
+                ...textShadow(),
+              }}>
+              AI
+            </Text>
+          </Grad>
+        </Press>
       </View>
 
-      {loading && <ActivityIndicator size="large" style={{ marginTop: 20 }} />}
+      {results ? (
+        <>
+          <SectionLabel action="Clear" onAction={clear}>
+            {loading ? 'Searching…' : `Results · ${results.length}`}
+          </SectionLabel>
 
-      <FlatList
-        data={tracks}
-        keyExtractor={(item) => String(item.trackId)}
-        renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => togglePlay(item)}>
-            <Image source={{ uri: item.artworkUrl100 }} style={styles.art} />
-            <View style={styles.info}>
-              <Text style={styles.trackName} numberOfLines={1}>
-                {item.trackName}
+          {loading ? (
+            <ActivityIndicator color={C.lunaBlue} style={{ marginTop: s(20) }} />
+          ) : results.length === 0 ? (
+            <Text style={{ fontFamily: F.bold, fontSize: s(11), color: C.ink3, marginTop: s(4) }}>
+              Nothing matched “{query}”.
+            </Text>
+          ) : (
+            <View style={{ gap: s(4) }}>
+              {results.map((t, i) => (
+                <TrackRow
+                  key={t.id}
+                  track={t}
+                  index={i}
+                  current={current?.id === t.id}
+                  playing={playing}
+                  onPress={() => play(results, i, { kind: 'Playing from search', name: query })}
+                  onLongPress={() => promptAddToPlaylist(t)}
+                />
+              ))}
+            </View>
+          )}
+        </>
+      ) : (
+        <>
+          <SectionLabel action="Clear" onAction={clearRecents}>
+            Recent
+          </SectionLabel>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(6) }}>
+            {recents.map((r) => (
+              <Chip key={r} label={r} onPress={() => run(r)} />
+            ))}
+          </View>
+
+          <SectionLabel action="See all">Made for you</SectionLabel>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            {...SCROLL}
+            style={{ marginHorizontal: -s(12) }}
+            contentContainerStyle={{ gap: s(10), paddingHorizontal: s(12), paddingBottom: s(8), paddingTop: s(2) }}>
+            {playlists.map((p) => {
+              const stats = statsOf(p);
+              return (
+                <Press key={p.id} onPress={() => openPlaylist(p.id)} scale={0.97}>
+                  <View style={{ width: s(120) }}>
+                    <Art source={p.art} size={s(120)} radius={R.md} style={SH.art}>
+                      <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'flex-start', padding: s(9) }}>
+                        <View
+                          style={{
+                            backgroundColor: 'rgba(10,22,48,.42)',
+                            paddingVertical: s(3),
+                            paddingHorizontal: s(7),
+                            borderRadius: 999,
+                          }}>
+                          <Text
+                            style={{
+                              fontFamily: F.black,
+                              fontSize: s(8),
+                              letterSpacing: s(8) * 0.12,
+                              color: '#fff',
+                            }}>
+                            {stats.count} TRACKS
+                          </Text>
+                        </View>
+                      </View>
+                    </Art>
+                    <Text
+                      numberOfLines={1}
+                      style={{ marginTop: s(7), fontFamily: F.extrabold, fontSize: s(11.5), color: C.ink }}>
+                      {p.name}
+                    </Text>
+                    <Text numberOfLines={1} style={{ fontFamily: F.bold, fontSize: s(9.5), color: C.ink3 }}>
+                      {stats.runtime}
+                      {p.note ? ` · ${p.note}` : ''}
+                    </Text>
+                  </View>
+                </Press>
+              );
+            })}
+          </ScrollView>
+
+          <SectionLabel>Moods</SectionLabel>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(8) }}>
+            {MOODS.map((m, i) => (
+              <Press
+                key={m.key}
+                onPress={() => run(m.name)}
+                scale={0.98}
+                style={{ width: '48%', flexGrow: 1 }}>
+                <Grad
+                  g={[G.mood1, G.mood2, G.mood3, G.mood4][i]}
+                  style={{
+                    height: s(72),
+                    borderRadius: R.md,
+                    padding: s(10),
+                    paddingHorizontal: s(11),
+                    justifyContent: 'space-between',
+                    overflow: 'hidden',
+                    ...SH.btn,
+                  }}>
+                  <Text style={{ fontSize: s(17) }}>{m.glyph}</Text>
+                  <View>
+                    <Text style={{ fontFamily: F.black, fontSize: s(12.5), color: '#fff' }}>{m.name}</Text>
+                    <Text style={{ fontFamily: F.bold, fontSize: s(9), color: 'rgba(255,255,255,.82)' }}>
+                      {m.sub}
+                    </Text>
+                  </View>
+                </Grad>
+              </Press>
+            ))}
+          </View>
+
+          {/* `.ticker` */}
+          <Card
+            style={{
+              marginTop: s(10),
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: s(9),
+              paddingVertical: s(9),
+              paddingHorizontal: s(12),
+            }}>
+            <View
+              style={{
+                width: s(8),
+                height: s(8),
+                borderRadius: s(4),
+                backgroundColor: C.greenBright,
+              }}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: F.extrabold, fontSize: s(10.5), color: C.ink }}>
+                Luna Radio · Aero Channel
               </Text>
-              <Text style={styles.artist} numberOfLines={1}>
-                {item.artistName}
+              <Text style={{ fontFamily: F.bold, fontSize: s(9), color: C.ink3 }}>
+                2,418 listening now
               </Text>
             </View>
-            <Text style={styles.playIcon}>
-              {playingId === item.trackId ? "❚❚" : "▶"}
-            </Text>
-          </Pressable>
-        )}
-      />
-    </View>
+            <AeroButton label="Tune in" icon="play" variant="green" onPress={() => run('aero chill')} />
+          </Card>
+
+          <SectionLabel action="History">Jump back in</SectionLabel>
+          <View style={{ gap: s(4) }}>
+            {history.map((h, i) => (
+              <QueueRow
+                key={h.track.id}
+                track={h.track}
+                note={h.note}
+                onPress={() =>
+                  play(
+                    history.map((x) => x.track),
+                    i,
+                    { kind: 'Playing from history', name: 'Jump back in' },
+                  )
+                }
+                onLongPress={() => promptAddToPlaylist(h.track)}
+              />
+            ))}
+          </View>
+        </>
+      )}
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 60,
-    paddingHorizontal: 16,
-    backgroundColor: "#fff",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 16,
-    color: "#4C1D95",
-  },
-  searchRow: { flexDirection: "row", gap: 8 },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 44,
-  },
-  button: {
-    backgroundColor: "#6D28D9",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    justifyContent: "center",
-  },
-  buttonText: { color: "#fff", fontWeight: "600" },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    gap: 12,
-  },
-  art: { width: 50, height: 50, borderRadius: 6, backgroundColor: "#eee" },
-  info: { flex: 1 },
-  trackName: { fontSize: 15, fontWeight: "600", color: "#1F2937" },
-  artist: { fontSize: 13, color: "#6B7280" },
-  playIcon: { fontSize: 18, color: "#6D28D9", paddingHorizontal: 8 },
-});
