@@ -1,35 +1,19 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AeroChrome } from '@/components/aero-chrome';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Search',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} />,
-        }}
-      />
+      // The chrome renders the app bar and the tab strip together, so it has to
+      // sit above the content rather than in the usual bottom slot. The dock is
+      // what occupies the bottom of the screen (see app/_layout.tsx).
+      tabBar={(props) => <AeroChrome {...props} />}
+      screenOptions={{ headerShown: false, tabBarPosition: 'top', sceneStyle: { backgroundColor: 'transparent' } }}>
+      <Tabs.Screen name="index" options={{ title: 'Search' }} />
+      <Tabs.Screen name="playlist" options={{ title: 'Playlist' }} />
+      <Tabs.Screen name="library" options={{ title: 'Library' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
   );
 }
