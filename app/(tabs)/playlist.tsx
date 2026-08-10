@@ -95,7 +95,9 @@ export default function PlaylistScreen() {
               onPress={() => play(tracks, i, source)}
               onLongPress={() =>
                 activePlaylist.custom
-                  ? removeFromPlaylist(activePlaylist.id, t.id)
+                  ? void removeFromPlaylist(activePlaylist.id, t.id).catch((err) =>
+                      console.warn('removeFromPlaylist failed:', err),
+                    )
                   : promptAddToPlaylist(t)
               }
             />

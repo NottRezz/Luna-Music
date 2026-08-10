@@ -1,12 +1,11 @@
 /**
  * Profile — `#view-profile` in design/mockup/index.html.
  *
- * Seeded account data. Supabase replaces it next phase, at which point the
- * form and Sign out become real; the controls are wired to local state so the
- * screen behaves correctly in the meantime.
+ * Backed by the Supabase session + profiles table (ADR 4). Sign out clears the
+ * SecureStore-cached session token.
  */
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { Art } from '@/components/aero/art';
@@ -22,25 +21,79 @@ import {
 import { Icon } from '@/components/aero/icon';
 import { Screen } from '@/components/screen';
 import { C, F, R, SH, s, textShadow } from '@/constants/aero';
-import { SEED_PROFILE } from '@/constants/seed';
+import type { ArtKey } from '@/constants/art';
+import { updateProfile } from '@/lib/db/profiles';
+import { useAuth } from '@/providers/auth';
+import { useLibrary } from '@/providers/library';
 
 const QUALITY = ['Normal', 'High', 'Lossless'] as const;
 
+function asArtKey(value: string | null | undefined): ArtKey {
+  const key = value ?? 'e';
+  return (['a', 'b', 'c', 'd', 'e', 'f'] as const).includes(key as ArtKey)
+    ? (key as ArtKey)
+    : 'e';
+}
+
 export default function ProfileScreen() {
-  const [username, setUsername] = useState<string>(SEED_PROFILE.username);
-  const [email, setEmail] = useState<string>(SEED_PROFILE.email);
-  const [password, setPassword] = useState<string>(SEED_PROFILE.password);
+  const { user, profile, signOut, updateLocalProfile, refreshProfile } = useAuth();
+  const { library, playlists, history } = useLibrary();
+
+  const displayName = profile?.display_name || profile?.username || user?.email?.split('@')[0] || 'Listener';
+  const username = profile?.username || 'user';
+  const email = user?.email || '';
+  const initials = initialsOf(displayName);
+
+  const [nameDraft, setNameDraft] = useState(displayName);
+  const [usernameDraft, setUsernameDraft] = useState(username);
   const [reveal, setReveal] = useState(false);
+  const [password, setPassword] = useState('••••••••');
   const [quality, setQuality] = useState<string>('Lossless');
   const [offline, setOffline] = useState(true);
   const [crossfade, setCrossfade] = useState(false);
   const [explicit, setExplicit] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNameDraft(displayName);
+    setUsernameDraft(username);
+  }, [displayName, username]);
+
+  const stats = useMemo(
+    () => [
+      { v: String(library.length), k: 'Songs' },
+      { v: String(playlists.filter((p) => p.custom).length), k: 'Playlists' },
+      { v: String(history.length), k: 'Recent' },
+    ],
+    [library.length, playlists, history.length],
+  );
+
+  const onSave = async () => {
+    if (!user) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const next = await updateProfile(user.id, {
+        display_name: nameDraft.trim() || null,
+        username: usernameDraft.trim().toLowerCase() || null,
+      });
+      updateLocalProfile(next);
+      setMessage('Saved.');
+      await refreshProfile();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not save profile.';
+      setMessage(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Screen>
       {/* `.profile-card` */}
       <Card style={{ flexDirection: 'row', alignItems: 'center', gap: s(13), padding: s(13) }}>
-        <Art source="e" size={s(58)} radius={s(17)} style={SH.artLg}>
+        <Art source={asArtKey(profile?.avatar_art)} size={s(58)} radius={s(17)} style={SH.artLg}>
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <Text
               style={{
@@ -50,18 +103,14 @@ export default function ProfileScreen() {
                 color: '#fff',
                 ...textShadow(0.45, 5),
               }}>
-              {SEED_PROFILE.initials}
+              {initials}
             </Text>
           </View>
         </Art>
 
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ fontFamily: F.black, fontSize: s(16), color: C.ink }}>
-            {SEED_PROFILE.name}
-          </Text>
-          <Text style={{ fontFamily: F.bold, fontSize: s(10.5), color: C.ink3 }}>
-            {SEED_PROFILE.handle}
-          </Text>
+          <Text style={{ fontFamily: F.black, fontSize: s(16), color: C.ink }}>{displayName}</Text>
+          <Text style={{ fontFamily: F.bold, fontSize: s(10.5), color: C.ink3 }}>@{username}</Text>
           <View
             style={{
               alignSelf: 'flex-start',
@@ -78,7 +127,7 @@ export default function ProfileScreen() {
                 letterSpacing: s(8) * 0.12,
                 color: '#6b3d05',
               }}>
-              {SEED_PROFILE.plan}
+              {(profile?.plan || 'FREE').toUpperCase()}
             </Text>
           </View>
         </View>
@@ -86,7 +135,7 @@ export default function ProfileScreen() {
 
       {/* `.profile-stats` */}
       <View style={{ flexDirection: 'row', gap: s(8), marginTop: s(10) }}>
-        {SEED_PROFILE.stats.map((st) => (
+        {stats.map((st) => (
           <View
             key={st.k}
             style={{
@@ -106,15 +155,25 @@ export default function ProfileScreen() {
 
       <SectionLabel>Account</SectionLabel>
       <View style={{ gap: s(9) }}>
+        <FormRow label="Display name">
+          <Field icon="person" value={nameDraft} onChangeText={setNameDraft} autoComplete="name" />
+        </FormRow>
+
         <FormRow label="Username">
-          <Field icon="person" value={username} onChangeText={setUsername} autoComplete="username" />
+          <Field
+            icon="person"
+            value={usernameDraft}
+            onChangeText={setUsernameDraft}
+            autoComplete="username"
+            autoCapitalize="none"
+          />
         </FormRow>
 
         <FormRow label="Email">
           <Field
             icon="mail"
             value={email}
-            onChangeText={setEmail}
+            editable={false}
             autoComplete="email"
             keyboardType="email-address"
             autoCapitalize="none"
@@ -127,6 +186,7 @@ export default function ProfileScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!reveal}
+            editable={false}
             autoComplete="current-password"
             right={
               <Press onPress={() => setReveal(!reveal)} scale={0.9}>
@@ -136,6 +196,19 @@ export default function ProfileScreen() {
           />
         </FormRow>
       </View>
+
+      {message ? (
+        <Text
+          style={{
+            fontFamily: F.bold,
+            fontSize: s(11),
+            color: C.ink2,
+            marginTop: s(8),
+            marginLeft: s(2),
+          }}>
+          {message}
+        </Text>
+      ) : null}
 
       <SectionLabel>Playback</SectionLabel>
       <Segmented options={QUALITY} value={quality} onChange={setQuality} style={{ marginTop: 0 }} />
@@ -162,8 +235,12 @@ export default function ProfileScreen() {
       </View>
 
       <View style={{ flexDirection: 'row', gap: s(8), marginTop: s(14) }}>
-        <AeroButton label="Save changes" style={{ flex: 1 }} />
-        <AeroButton label="Sign out" variant="quiet" />
+        <AeroButton
+          label={saving ? 'Saving…' : 'Save changes'}
+          style={{ flex: 1 }}
+          onPress={saving ? undefined : () => void onSave()}
+        />
+        <AeroButton label="Sign out" variant="quiet" onPress={() => void signOut()} />
       </View>
     </Screen>
   );
@@ -187,4 +264,11 @@ function FormRow({ label, children }: { label: string; children: React.ReactNode
       <View style={{ flexDirection: 'row' }}>{children}</View>
     </View>
   );
+}
+
+function initialsOf(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'LM';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
 }

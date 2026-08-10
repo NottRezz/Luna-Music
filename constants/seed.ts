@@ -2,8 +2,8 @@
  * Demo content, copied from design/mockup/app.js and index.html so the app
  * looks like the mockup on first launch.
  *
- * Supabase replaces this next phase. Anything the user creates is stored
- * separately and persisted — see providers/library.tsx.
+ * User-authored playlists, favorites, and recently played history sync through
+ * Supabase (ADR 4) — see providers/library.tsx and lib/db/.
  */
 
 import type { Playlist, Track } from '@/types/music';
@@ -114,7 +114,7 @@ export const GENRES = [
   { name: 'Trance', count: 78, art: 'd' },
 ] as const;
 
-/** Profile screen. Replaced by the real Supabase session next phase. */
+/** Demo profile figures kept for reference; the Profile screen uses Supabase. */
 export const SEED_PROFILE = {
   name: 'Alex Rivera',
   handle: '@alexrivera',
