@@ -2,8 +2,8 @@
  * "Add to playlist" prompt.
  *
  * Reachable by long-pressing any track row or search result. Only user-created
- * playlists can be added to — the four seeded ones are demo content standing in
- * for what Supabase will serve, so editing them would be misleading.
+ * playlists can be added to — the four seeded ones are read-only demo chrome;
+ * real playlists sync through Supabase.
  */
 
 import { useState } from 'react';
@@ -32,14 +32,21 @@ export function AddToPlaylist() {
   };
 
   const add = (playlistId: string) => {
-    if (pendingTrack) addToPlaylist(playlistId, pendingTrack);
+    if (!pendingTrack) return;
+    void addToPlaylist(playlistId, pendingTrack).catch((err) =>
+      console.warn('addToPlaylist failed:', err),
+    );
     close();
   };
 
   const createAndAdd = () => {
     const trimmed = name.trim();
-    if (!trimmed) return;
-    add(createPlaylist(trimmed));
+    if (!trimmed || !pendingTrack) return;
+    const track = pendingTrack;
+    void createPlaylist(trimmed)
+      .then((id) => addToPlaylist(id, track))
+      .then(() => close())
+      .catch((err) => console.warn('createAndAdd failed:', err));
   };
 
   const insets = useSafeAreaInsets();

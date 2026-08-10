@@ -35,13 +35,21 @@ export function PlaylistManager() {
   const create = () => {
     const t = name.trim();
     if (!t) return;
-    setActivePlaylist(createPlaylist(t));
-    setName('');
-    closeManager();
+    void createPlaylist(t)
+      .then((id) => {
+        setActivePlaylist(id);
+        setName('');
+        closeManager();
+      })
+      .catch((err) => console.warn('createPlaylist failed:', err));
   };
 
   const commitRename = () => {
-    if (editing && draft.trim()) renamePlaylist(editing, draft.trim());
+    if (editing && draft.trim()) {
+      void renamePlaylist(editing, draft.trim()).catch((err) =>
+        console.warn('renamePlaylist failed:', err),
+      );
+    }
     setEditing(null);
   };
 
@@ -126,7 +134,15 @@ export function PlaylistManager() {
                           setDraft(p.name);
                         }}
                       />
-                      <MiniBtn icon="trash" tone="red" onPress={() => deletePlaylist(p.id)} />
+                      <MiniBtn
+                        icon="trash"
+                        tone="red"
+                        onPress={() =>
+                          void deletePlaylist(p.id).catch((err) =>
+                            console.warn('deletePlaylist failed:', err),
+                          )
+                        }
+                      />
                     </View>
                   ) : null}
 

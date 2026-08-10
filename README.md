@@ -1,50 +1,66 @@
-# Welcome to your Expo app 👋
+# Luna Music
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo React Native music player for CPRG 303-B (SPHR Studios). Streams previews from the iTunes Search API; account data lives in **Supabase** (ADR 4).
 
-## Get started
+## Stack
 
-1. Install dependencies
+- React Native + Expo (managed) + Expo Router
+- Supabase Auth + Postgres (playlists, favorites, recently played)
+- Session tokens cached with `expo-secure-store`
+- UI follows the Frutiger Aero mockup in `design/mockup/`
+
+## Setup
+
+1. Install dependencies:
 
    ```bash
    npm install
    ```
 
-2. Start the app
+2. Create a Supabase project and copy `.env.example` → `.env`:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Fill in `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` from **Project Settings → API**.
+
+3. Apply the schema + RLS policies. In the Supabase SQL Editor, run:
+
+   [`supabase/migrations/20260810000000_luna_schema.sql`](supabase/migrations/20260810000000_luna_schema.sql)
+
+   Tables: `profiles`, `tracks`, `playlists`, `playlist_tracks`, `favorites`, `recently_played`.
+
+4. (Recommended) In Supabase Auth settings, disable email confirmation for the course build so sign-up can enter the app immediately.
+
+5. Start the app:
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+## Auth & data
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+| Concern | Where it lives |
+| --- | --- |
+| Sign up / login / passwords | Supabase Auth |
+| Session persistence | `expo-secure-store` via `lib/supabase.ts` |
+| Profile | `profiles` |
+| Playlists | `playlists` + `playlist_tracks` |
+| Liked tracks | `favorites` |
+| Jump-back-in history | `recently_played` |
+| Recent search chips | local AsyncStorage only |
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Seeded demo playlists remain read-only UI chrome; anything the user creates syncs to their account.
 
-## Get a fresh project
+## Project layout
 
-When you're ready, run:
-
-```bash
-npm run reset-project
 ```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+app/(auth)/          Login + register (stack)
+app/(tabs)/          Search, Playlist, Library, Profile
+lib/supabase.ts      Client + SecureStore adapter
+lib/db/              Typed CRUD helpers
+providers/auth.tsx   Session + profile
+providers/library.tsx Syncs remote library when signed in
+supabase/migrations/ Postgres schema + RLS
+```

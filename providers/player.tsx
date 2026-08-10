@@ -11,6 +11,7 @@ import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-au
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { SEED_TRACKS } from '@/constants/seed';
+import { useLibrary } from '@/providers/library';
 import { fromItunes, type Track } from '@/types/music';
 
 type Source = { kind: string; name: string };
@@ -32,6 +33,7 @@ type PlayerValue = {
   seek: (seconds: number) => void;
   setShuffle: (v: boolean) => void;
   setRepeat: (v: boolean) => void;
+  /** Persist like/unlike to Supabase favorites. */
   setLiked: (v: boolean) => void;
 };
 
@@ -141,6 +143,7 @@ function lookup(term: string): Promise<string | null> {
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const player = useAudioPlayer(null, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
+  const { isFavorite, toggleFavorite, rememberPlay } = useLibrary();
 
   // Seeded so the dock is populated on first launch, as it is in the mockup.
   // Nothing is loaded or played until the user asks for it.
@@ -150,7 +153,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState(false);
-  const [liked, setLiked] = useState(false);
   const [volume, setVolumeState] = useState(1);
   const [muted, setMuted] = useState(false);
   /** What the native player should be at, for re-applying after a load. */
@@ -171,6 +173,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const track = queue[index];
+  const liked = track ? isFavorite(track.id) : false;
+
+  const setLiked = useCallback(
+    (v: boolean) => {
+      if (!track) return;
+      if (v === isFavorite(track.id)) return;
+      void toggleFavorite(track).catch((err) => console.warn('toggleFavorite failed:', err));
+    },
+    [track, isFavorite, toggleFavorite],
+  );
 
   /* --- Volume ------------------------------------------------ */
 
@@ -219,11 +231,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     (q: Track[], i: number, src?: Source) => {
       setQueue(q);
       setIndex(i);
-      setLiked(false);
       if (src) setSource(src);
-      void load(q[i]);
+      const nextTrack = q[i];
+      void load(nextTrack);
+      if (nextTrack) void rememberPlay(nextTrack);
     },
-    [load],
+    [load, rememberPlay],
   );
 
   const step = useCallback(
@@ -233,10 +246,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         ? Math.floor(Math.random() * queue.length)
         : (index + delta + queue.length) % queue.length;
       setIndex(i);
-      setLiked(false);
-      void load(queue[i]);
+      const nextTrack = queue[i];
+      void load(nextTrack);
+      if (nextTrack) void rememberPlay(nextTrack);
     },
-    [queue, index, shuffle, load],
+    [queue, index, shuffle, load, rememberPlay],
   );
 
   const next = useCallback(() => step(1), [step]);
@@ -302,7 +316,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       queue, index, track, source, status.playing,
-      loading, shuffle, repeat, liked, play, toggle, next, prev, seek,
+      loading, shuffle, repeat, liked, play, toggle, next, prev, seek, setLiked,
     ],
   );
 

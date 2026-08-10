@@ -6,7 +6,7 @@ import {
   Nunito_900Black,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -21,12 +21,14 @@ import { Dock } from '@/components/player/dock';
 import { NowPlaying } from '@/components/player/now-playing';
 import { PlaylistManager } from '@/components/playlist-manager';
 import { G } from '@/constants/aero';
+import { AuthProvider, useAuth } from '@/providers/auth';
 import { LibraryProvider } from '@/providers/library';
 import { PlayerProvider } from '@/providers/player';
 import { UIProvider } from '@/providers/ui';
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  // Auth is the first surface; tabs open after a session exists (ADR 2).
+  anchor: '(auth)',
 };
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -51,30 +53,63 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <LibraryProvider>
-          <PlayerProvider>
-            <UIProvider>
-              <Grad g={G.app} style={{ flex: 1 }}>
-                <View style={{ flex: 1 }}>
-                  <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
-                    <Stack.Screen name="(tabs)" />
-                  </Stack>
-                </View>
-
-                {/* These live outside the navigator so playback state and the
-                    mini-player survive tab changes, and so the sheets can dim
-                    and cover the whole shell — dock included — the way
-                    `.sheet { inset: 0; z-index: 10 }` does. */}
-                <Dock />
-                <NowPlaying />
-                <AddToPlaylist />
-                <PlaylistManager />
-              </Grad>
-            </UIProvider>
-          </PlayerProvider>
-        </LibraryProvider>
+        <AuthProvider>
+          <LibraryProvider>
+            <PlayerProvider>
+              <UIProvider>
+                <Grad g={G.app} style={{ flex: 1 }}>
+                  <AuthGate />
+                </Grad>
+              </UIProvider>
+            </PlayerProvider>
+          </LibraryProvider>
+        </AuthProvider>
         <StatusBar style="light" />
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+/**
+ * Stack + session redirect. Login/Register sit in `(auth)`; the bottom-tab
+ * group only opens once Supabase has a session (ADR 2 + ADR 4).
+ */
+function AuthGate() {
+  const { ready, session } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!ready) return;
+    const inAuth = segments[0] === '(auth)';
+    if (!session && !inAuth) {
+      router.replace('/(auth)/login');
+    } else if (session && inAuth) {
+      router.replace('/(tabs)');
+    }
+  }, [ready, session, segments, router]);
+
+  if (!ready) return null;
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+
+      {session ? (
+        <>
+          {/* These live outside the navigator so playback state and the
+              mini-player survive tab changes, and so the sheets can dim
+              and cover the whole shell — dock included — the way
+              `.sheet { inset: 0; z-index: 10 }` does. */}
+          <Dock />
+          <NowPlaying />
+          <AddToPlaylist />
+          <PlaylistManager />
+        </>
+      ) : null}
+    </View>
   );
 }
