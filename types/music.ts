@@ -39,6 +39,35 @@ export function upscale(url: string | undefined) {
   return url?.replace('100x100', '600x600');
 }
 
+/**
+ * Artwork lives on *.mzstatic.com, previews on *.apple.com. Nothing else is
+ * ever loaded or played.
+ *
+ * These patterns are the exact pair enforced by the `tracks_artwork_url_host`
+ * and `tracks_preview_url_host` CHECK constraints — see
+ * supabase/migrations/20260810180000_security_hardening.sql. Keep them in step:
+ * the database is the boundary that matters (LM-23, a shared cache where the
+ * first writer of an id owns the row), and this is here so a legitimate URL is
+ * quietly dropped rather than sent and rejected. Without it, one odd host from
+ * the iTunes API would turn into a constraint violation on every like,
+ * playlist-add and play.
+ *
+ * The host must be followed immediately by `/`, which is what stops
+ * `https://is1-ssl.mzstatic.com@evil.com/` and `https://mzstatic.com.evil.com/`.
+ */
+const ARTWORK_HOST = /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.mzstatic\.com\//;
+const PREVIEW_HOST = /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.apple\.com\//;
+
+function onApple(url: string | undefined, host: RegExp): string | undefined {
+  if (!url) return undefined;
+  // The Search API still hands back http:// for some previews.
+  const https = url.replace(/^http:\/\//i, 'https://');
+  return host.test(https) ? https : undefined;
+}
+
+export const appleArtwork = (url: string | undefined) => onApple(url, ARTWORK_HOST);
+export const applePreview = (url: string | undefined) => onApple(url, PREVIEW_HOST);
+
 export function mmss(sec: number) {
   const n = Math.max(0, Math.round(sec));
   return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
@@ -66,8 +95,8 @@ export function fromItunes(r: {
     artist: r.artistName,
     duration: Math.round((r.trackTimeMillis ?? 30000) / 1000),
     art: artFor(id),
-    artworkUrl: upscale(r.artworkUrl100),
-    previewUrl: r.previewUrl,
+    artworkUrl: appleArtwork(upscale(r.artworkUrl100)),
+    previewUrl: applePreview(r.previewUrl),
     label: coverLabel(r.trackName),
   };
 }

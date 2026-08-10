@@ -11,7 +11,7 @@ import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-au
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useLibrary } from '@/providers/library';
-import { fromItunes, type Track } from '@/types/music';
+import { applePreview, fromItunes, type Track } from '@/types/music';
 
 type Source = { kind: string; name: string };
 
@@ -135,7 +135,7 @@ function lookup(term: string): Promise<string | null> {
   return getJson(
     `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&limit=1`,
   )
-    .then((data) => (data.results?.[0]?.previewUrl as string | undefined) ?? null)
+    .then((data) => applePreview(data.results?.[0]?.previewUrl as string | undefined) ?? null)
     .catch(() => null);
 }
 
@@ -213,7 +213,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (token !== loadToken.current) return;
         if (!uri) return;
 
-        player.replace({ uri: uri.replace(/^http:\/\//i, 'https://') });
+        // Already normalised and host-checked by applePreview, at every source:
+        // the iTunes lookup, a search result, and a row read back out of the
+        // shared tracks cache. Nothing reaches the player unvetted (LM-23).
+        player.replace({ uri });
         // `replace` swaps the underlying source, so re-assert the level rather
         // than trusting it to carry over.
         player.volume = levelRef.current;

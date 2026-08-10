@@ -25,6 +25,8 @@ type AuthValue = {
     displayName?: string,
   ) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  /** Rotate the signed-in account's password. See `changePassword` below. */
+  changePassword: (current: string, next: string) => Promise<{ error: string | null }>;
   refreshProfile: () => Promise<void>;
   updateLocalProfile: (patch: Partial<Profile>) => void;
 };
@@ -116,6 +118,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
   }, []);
 
+  /**
+   * Rotate the password. Until this existed there was no way to replace a
+   * credential you thought was compromised — the Profile field was
+   * `editable={false}` and there is still no reset-by-email flow (LM-27).
+   *
+   * Supabase's `updateUser` does NOT ask for the current password: possession
+   * of a valid session is enough. That means an unlocked phone is enough to
+   * lock the owner out of their own account, so the current password is
+   * verified first by re-signing in with it. That call also fails closed if the
+   * account has been disabled server-side since this session was minted.
+   *
+   * `signInWithPassword` replaces the session on success, which is harmless
+   * here — it is the same user, and `onAuthStateChange` keeps state in step.
+   */
+  const changePassword = useCallback(
+    async (current: string, next: string) => {
+      if (!supabase) return { error: 'Supabase is not configured.' };
+      const email = session?.user?.email;
+      if (!email) return { error: 'No signed-in account.' };
+      if (next.length < 6) return { error: 'New password must be at least 6 characters.' };
+      if (next === current) return { error: 'That is already your password.' };
+
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email,
+        password: current,
+      });
+      if (verifyError) return { error: 'Current password is incorrect.' };
+
+      const { error } = await supabase.auth.updateUser({ password: next });
+      return { error: error?.message ?? null };
+    },
+    [session?.user?.email],
+  );
+
   const refreshProfile = useCallback(async () => {
     if (session?.user) await loadProfile(session.user.id);
   }, [loadProfile, session?.user]);
@@ -134,6 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signUp,
       signOut,
+      changePassword,
       refreshProfile,
       updateLocalProfile,
     }),
@@ -145,6 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signUp,
       signOut,
+      changePassword,
       refreshProfile,
       updateLocalProfile,
     ],

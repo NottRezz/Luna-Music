@@ -36,7 +36,7 @@ function asArtKey(value: string | null | undefined): ArtKey {
 }
 
 export default function ProfileScreen() {
-  const { user, profile, signOut, updateLocalProfile, refreshProfile } = useAuth();
+  const { user, profile, signOut, changePassword, updateLocalProfile, refreshProfile } = useAuth();
   const { library, playlists, history } = useLibrary();
 
   const displayName = profile?.display_name || profile?.username || user?.email?.split('@')[0] || 'Listener';
@@ -47,7 +47,11 @@ export default function ProfileScreen() {
   const [nameDraft, setNameDraft] = useState(displayName);
   const [usernameDraft, setUsernameDraft] = useState(username);
   const [reveal, setReveal] = useState(false);
-  const [password, setPassword] = useState('••••••••');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [changing, setChanging] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [passwordOk, setPasswordOk] = useState(false);
   const [quality, setQuality] = useState<string>('Lossless');
   const [offline, setOffline] = useState(true);
   const [crossfade, setCrossfade] = useState(false);
@@ -68,6 +72,29 @@ export default function ProfileScreen() {
     ],
     [library.length, playlists, history.length],
   );
+
+  const onChangePassword = async () => {
+    setPasswordMessage(null);
+    setPasswordOk(false);
+    if (!currentPassword || !newPassword) {
+      setPasswordMessage('Enter your current password and a new one.');
+      return;
+    }
+    setChanging(true);
+    const { error } = await changePassword(currentPassword, newPassword);
+    setChanging(false);
+    if (error) {
+      setPasswordMessage(error);
+      return;
+    }
+    // Clear both fields on success so the new password is not left sitting in
+    // component state, or on screen behind the reveal toggle.
+    setCurrentPassword('');
+    setNewPassword('');
+    setReveal(false);
+    setPasswordOk(true);
+    setPasswordMessage('Password updated.');
+  };
 
   const onSave = async () => {
     if (!user) return;
@@ -180,14 +207,22 @@ export default function ProfileScreen() {
           />
         </FormRow>
 
-        <FormRow label="Password">
+      </View>
+
+      {/* Was a disabled field showing eight fixed bullets, so an account whose
+          password was compromised could not replace it and there is still no
+          reset-by-email flow. See LM-27. */}
+      <SectionLabel>Change password</SectionLabel>
+      <View style={{ gap: s(9) }}>
+        <FormRow label="Current password">
           <Field
             icon="lock"
-            value={password}
-            onChangeText={setPassword}
+            value={currentPassword}
+            onChangeText={setCurrentPassword}
             secureTextEntry={!reveal}
-            editable={false}
             autoComplete="current-password"
+            placeholder="Your password now"
+            editable={!changing}
             right={
               <Press onPress={() => setReveal(!reveal)} scale={0.9}>
                 <Icon name="eye" size={s(16)} color={reveal ? C.lunaBlue : C.ink3} />
@@ -195,6 +230,38 @@ export default function ProfileScreen() {
             }
           />
         </FormRow>
+
+        <FormRow label="New password">
+          <Field
+            icon="lock"
+            value={newPassword}
+            onChangeText={setNewPassword}
+            secureTextEntry={!reveal}
+            autoComplete="new-password"
+            placeholder="At least 6 characters"
+            editable={!changing}
+            onSubmitEditing={() => void onChangePassword()}
+            returnKeyType="go"
+          />
+        </FormRow>
+
+        {passwordMessage ? (
+          <Text
+            style={{
+              fontFamily: F.bold,
+              fontSize: s(11),
+              color: passwordOk ? C.ink2 : '#b42318',
+              marginLeft: s(2),
+            }}>
+            {passwordMessage}
+          </Text>
+        ) : null}
+
+        <AeroButton
+          label={changing ? 'Updating…' : 'Update password'}
+          variant="quiet"
+          onPress={changing ? undefined : () => void onChangePassword()}
+        />
       </View>
 
       {message ? (
