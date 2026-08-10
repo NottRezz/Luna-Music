@@ -245,9 +245,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const i = shuffle
         ? Math.floor(Math.random() * queue.length)
         : (index + delta + queue.length) % queue.length;
-      // TEMP (LM-2) — one line per track end means fixed; two means the
-      // didJustFinish effect is still re-firing. Remove after verifying.
-      console.log('[LM-2] advance', delta, ':', index, '->', i, queue[i]?.title);
       setIndex(i);
       const nextTrack = queue[i];
       void load(nextTrack);

@@ -1,0 +1,39 @@
+-- LM-6 — remove the blanket UPDATE grant on public.tracks.
+--
+-- `tracks_update_authenticated` was `using (true) with check (true)`, which let
+-- any signed-in account rewrite any track's title, artist, artwork or
+-- preview_url. `tracks` is a single shared cache keyed by iTunes id and pointed
+-- at by every user's playlists, favorites and history, so one account editing a
+-- row changed it for everybody.
+--
+-- Read and insert stay open: it is a metadata cache and the client has to be
+-- able to populate it before a foreign key can reference the row. Only the
+-- ability to overwrite a row that already exists is withdrawn.
+--
+-- ---------------------------------------------------------------------------
+-- ORDER MATTERS. Ship the client change first.
+-- ---------------------------------------------------------------------------
+-- lib/db/tracks.ts must already be writing with `ignoreDuplicates: true`
+-- before this runs. A Supabase `.upsert()` without it compiles to
+-- `insert … on conflict do update`, and Postgres evaluates the UPDATE policy
+-- against the conflicting row — so with no such policy it raises 42501 rather
+-- than quietly inserting nothing. `ensureTrack` rethrows, and it is on the
+-- like, add-to-playlist and record-a-play paths, so every one of those breaks
+-- for any track already in the cache.
+--
+-- If this has already been applied against an old client, roll it back with:
+--
+--   create policy "tracks_update_authenticated"
+--     on public.tracks for update to authenticated
+--     using (true) with check (true);
+--
+-- ---------------------------------------------------------------------------
+-- Safe to re-run.
+drop policy if exists "tracks_update_authenticated" on public.tracks;
+
+-- Verification. Expect exactly two rows, SELECT and INSERT — no UPDATE.
+--
+--   select policyname, cmd
+--   from pg_policies
+--   where schemaname = 'public' and tablename = 'tracks'
+--   order by policyname;

@@ -34,7 +34,26 @@ export function rowToTrack(row: TrackRow): Track {
   };
 }
 
-/** Upsert track metadata so playlist/favorite/history FKs can reference it. */
+/**
+ * Insert track metadata if it is not cached yet, so playlist/favorite/history
+ * foreign keys have a row to reference.
+ *
+ * `ignoreDuplicates` makes this `on conflict do nothing` rather than
+ * `on conflict do update`, which is what lets `tracks` have no UPDATE policy at
+ * all — see LM-6. `tracks` is one shared table keyed by iTunes id, so a policy
+ * permissive enough to serve this call from the client was permissive enough
+ * for any account to rewrite any track's title, artist or preview_url for
+ * everybody. Insert-only closes that without a per-row owner.
+ *
+ * The cost is that cached metadata never refreshes. That is deliberate: a
+ * refresh path belongs in a `security definer` function that can decide what is
+ * allowed to change, not in a blanket UPDATE grant to every signed-in user.
+ *
+ * Do not "fix" this back to a plain upsert. Postgres evaluates the UPDATE
+ * policy on the conflicting row of an `on conflict do update`, so with the
+ * policy dropped that variant raises 42501 on the second write of any track —
+ * which is every like, playlist add and play after the first.
+ */
 export async function ensureTrack(track: Track) {
   const client = requireSupabase();
   const row = trackToRow(track);
@@ -49,7 +68,7 @@ export async function ensureTrack(track: Track) {
       preview_url: row.preview_url,
       label: row.label,
     },
-    { onConflict: 'id' },
+    { onConflict: 'id', ignoreDuplicates: true },
   );
   if (error) throw error;
 }
