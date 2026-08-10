@@ -13,6 +13,7 @@ import { Text, View } from 'react-native';
 import { Art } from '@/components/aero/art';
 import { AeroButton, Card, IconSq, SectionLabel, StatTile } from '@/components/aero/primitives';
 import { TrackRow } from '@/components/aero/track-row';
+import { Empty } from '@/components/empty';
 import { Screen } from '@/components/screen';
 import { C, F, R, SH, s } from '@/constants/aero';
 import { useLibrary } from '@/providers/library';
@@ -22,9 +23,32 @@ import { useUI } from '@/providers/ui';
 export default function PlaylistScreen() {
   const { activePlaylist, tracksOf, statsOf, removeFromPlaylist } = useLibrary();
   const { play, track: current, playing, shuffle, setShuffle } = usePlayer();
-  const { promptAddToPlaylist, openManager } = useUI();
+  const { openManager } = useUI();
 
-  const [liked, setLiked] = useState(true);
+  // Starts off. It used to start on, so every playlist opened already hearted
+  // — asserting a state the app does not store. The control is still inert;
+  // see the note on the actions row.
+  const [liked, setLiked] = useState(false);
+
+  // The account can now genuinely have no playlists — there are no seeded ones
+  // underneath to fall back to — so this screen has to stand on its own.
+  if (!activePlaylist) {
+    return (
+      <Screen>
+        <Empty
+          icon="list"
+          title="No playlists yet"
+          hint="Find a song in Search, press and hold it, and you can start your first playlist from there."
+        />
+        <AeroButton
+          label="New playlist"
+          icon="plus"
+          onPress={openManager}
+          style={{ marginTop: s(12) }}
+        />
+      </Screen>
+    );
+  }
 
   const tracks = tracksOf(activePlaylist);
   const stats = statsOf(activePlaylist);
@@ -52,7 +76,7 @@ export default function PlaylistScreen() {
             {activePlaylist.name}
           </Text>
           <Text style={{ fontFamily: F.bold, fontSize: s(10), color: C.ink2 }}>
-            {activePlaylist.owner} · {stats.count} tracks
+            {stats.count} {stats.count === '1' ? 'track' : 'tracks'} · {stats.runtime}
           </Text>
         </View>
       </Card>
@@ -71,18 +95,22 @@ export default function PlaylistScreen() {
         <IconSq name="more" onPress={openManager} />
       </View>
 
-      {/* `.stat-strip` */}
+      {/* `.stat-strip`, two tiles rather than three. The mockup's third was
+          "SAVED", a count of other people saving your playlist — there is no
+          sharing, so nothing could ever produce that number. Seeded playlists
+          printed 312, 204, 488; real ones printed 0 forever. */}
       <View style={{ flexDirection: 'row', gap: s(8), marginTop: s(10) }}>
         <StatTile k="TRACKS" v={stats.count} tone="blue" />
         <StatTile k="PLAYTIME" v={stats.runtime} tone="orange" />
-        <StatTile k="SAVED" v={stats.saves} tone="green" />
       </View>
 
-      <SectionLabel action="Sort: Custom">Tracks</SectionLabel>
+      <SectionLabel>Tracks</SectionLabel>
       {tracks.length === 0 ? (
-        <Text style={{ fontFamily: F.bold, fontSize: s(11), color: C.ink3 }}>
-          Nothing here yet — long-press a song in Search to add it.
-        </Text>
+        <Empty
+          icon="note"
+          title="This playlist is empty"
+          hint="Search for a song, then press and hold it to add it here."
+        />
       ) : (
         <View style={{ gap: s(4) }}>
           {tracks.map((t, i) => (
@@ -93,12 +121,13 @@ export default function PlaylistScreen() {
               current={current?.id === t.id}
               playing={playing}
               onPress={() => play(tracks, i, source)}
+              // Every playlist is the account's own now, so long-press always
+              // means remove. It used to branch on `custom` because the seeded
+              // ones could not be edited.
               onLongPress={() =>
-                activePlaylist.custom
-                  ? void removeFromPlaylist(activePlaylist.id, t.id).catch((err) =>
-                      console.warn('removeFromPlaylist failed:', err),
-                    )
-                  : promptAddToPlaylist(t)
+                void removeFromPlaylist(activePlaylist.id, t.id).catch((err) =>
+                  console.warn('removeFromPlaylist failed:', err),
+                )
               }
             />
           ))}

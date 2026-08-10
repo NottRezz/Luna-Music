@@ -5,28 +5,28 @@ export type Track = {
   id: string;
   title: string;
   artist: string;
-  /** Seconds. iTunes previews are ~30s; seeded demo tracks use their full length. */
+  /** Seconds. iTunes previews are ~30s. */
   duration: number;
   /** Baked swatch key, used when there is no real cover. */
   art: ArtKey;
   /** Real cover from the iTunes API, when the track came from a search. */
   artworkUrl?: string;
-  /** Audio to play. Absent on seeded demo tracks, which are visual only. */
+  /** Audio to play. */
   previewUrl?: string;
   /** Big word stamped across the Now Playing cover. */
   label?: string;
 };
 
+/**
+ * A playlist the signed-in account owns. There is no other kind — `owner`,
+ * `note` and `custom` are gone with the seeded demo playlists that needed them
+ * to mark themselves read-only and print a "Weekly mix" sub-line.
+ */
 export type Playlist = {
   id: string;
   name: string;
-  owner: string;
   art: ArtKey;
   trackIds: string[];
-  /** Sub-line on the carousel card, e.g. "Weekly mix". Seeded playlists only. */
-  note?: string;
-  /** User-created playlists can be renamed and deleted; seeded ones cannot. */
-  custom?: boolean;
 };
 
 /** Prefer a real cover, fall back to the track's swatch. */

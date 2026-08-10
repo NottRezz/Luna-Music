@@ -63,7 +63,7 @@ export default function ProfileScreen() {
   const stats = useMemo(
     () => [
       { v: String(library.length), k: 'Songs' },
-      { v: String(playlists.filter((p) => p.custom).length), k: 'Playlists' },
+      { v: String(playlists.length), k: 'Playlists' },
       { v: String(history.length), k: 'Recent' },
     ],
     [library.length, playlists, history.length],

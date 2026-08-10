@@ -1,8 +1,14 @@
 /**
  * Search — `#view-search` in design/mockup/index.html.
  *
- * The browse sections are the mockup's, verbatim. The field itself is live:
- * submitting a query swaps the browse stack for real iTunes results.
+ * Submitting a query swaps the browse stack for real iTunes results.
+ *
+ * The browse sections were the mockup's verbatim, which meant they printed
+ * fiction: four playlists the account did not own, five searches it had not
+ * run, three tracks it had not played, and a "Luna Radio" channel with 2,418
+ * listeners that does not exist. Each one now renders the account's own data or
+ * an empty state that says what to do. Moods stay because each runs a real
+ * search — they are the only thing here a new account can act on.
  */
 
 import { useRouter } from 'expo-router';
@@ -10,19 +16,12 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 
 import { Art } from '@/components/aero/art';
-import {
-  AeroButton,
-  Card,
-  Chip,
-  Field,
-  Grad,
-  Press,
-  SectionLabel,
-} from '@/components/aero/primitives';
+import { Chip, Field, Grad, Press, SectionLabel } from '@/components/aero/primitives';
 import { QueueRow, TrackRow } from '@/components/aero/track-row';
+import { Empty } from '@/components/empty';
 import { Screen } from '@/components/screen';
 import { C, F, G, R, SCROLL, SH, s, textShadow } from '@/constants/aero';
-import { MOODS } from '@/constants/seed';
+import { MOODS } from '@/constants/browse';
 import { useLibrary } from '@/providers/library';
 import { searchItunes, usePlayer } from '@/providers/player';
 import { useUI } from '@/providers/ui';
@@ -147,62 +146,73 @@ export default function SearchScreen() {
         </>
       ) : (
         <>
-          <SectionLabel action="Clear" onAction={clearRecents}>
-            Recent
-          </SectionLabel>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(6) }}>
-            {recents.map((r) => (
-              <Chip key={r} label={r} onPress={() => run(r)} />
-            ))}
-          </View>
+          {recents.length > 0 ? (
+            <>
+              <SectionLabel action="Clear" onAction={clearRecents}>
+                Recent
+              </SectionLabel>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(6) }}>
+                {recents.map((r) => (
+                  <Chip key={r} label={r} onPress={() => run(r)} />
+                ))}
+              </View>
+            </>
+          ) : null}
 
-          <SectionLabel action="See all">Made for you</SectionLabel>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            {...SCROLL}
-            style={{ marginHorizontal: -s(12) }}
-            contentContainerStyle={{ gap: s(10), paddingHorizontal: s(12), paddingBottom: s(8), paddingTop: s(2) }}>
-            {playlists.map((p) => {
-              const stats = statsOf(p);
-              return (
-                <Press key={p.id} onPress={() => openPlaylist(p.id)} scale={0.97}>
-                  <View style={{ width: s(120) }}>
-                    <Art source={p.art} size={s(120)} radius={R.md} style={SH.art}>
-                      <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'flex-start', padding: s(9) }}>
-                        <View
-                          style={{
-                            backgroundColor: 'rgba(10,22,48,.42)',
-                            paddingVertical: s(3),
-                            paddingHorizontal: s(7),
-                            borderRadius: 999,
-                          }}>
-                          <Text
+          <SectionLabel>Your playlists</SectionLabel>
+          {playlists.length === 0 ? (
+            <Empty
+              icon="list"
+              title="No playlists yet"
+              hint="Search for a song, then press and hold it to start one."
+            />
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              {...SCROLL}
+              style={{ marginHorizontal: -s(12) }}
+              contentContainerStyle={{ gap: s(10), paddingHorizontal: s(12), paddingBottom: s(8), paddingTop: s(2) }}>
+              {playlists.map((p) => {
+                const stats = statsOf(p);
+                return (
+                  <Press key={p.id} onPress={() => openPlaylist(p.id)} scale={0.97}>
+                    <View style={{ width: s(120) }}>
+                      <Art source={p.art} size={s(120)} radius={R.md} style={SH.art}>
+                        <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'flex-start', padding: s(9) }}>
+                          <View
                             style={{
-                              fontFamily: F.black,
-                              fontSize: s(8),
-                              letterSpacing: s(8) * 0.12,
-                              color: '#fff',
+                              backgroundColor: 'rgba(10,22,48,.42)',
+                              paddingVertical: s(3),
+                              paddingHorizontal: s(7),
+                              borderRadius: 999,
                             }}>
-                            {stats.count} TRACKS
-                          </Text>
+                            <Text
+                              style={{
+                                fontFamily: F.black,
+                                fontSize: s(8),
+                                letterSpacing: s(8) * 0.12,
+                                color: '#fff',
+                              }}>
+                              {stats.count} {stats.count === '1' ? 'TRACK' : 'TRACKS'}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                    </Art>
-                    <Text
-                      numberOfLines={1}
-                      style={{ marginTop: s(7), fontFamily: F.extrabold, fontSize: s(11.5), color: C.ink }}>
-                      {p.name}
-                    </Text>
-                    <Text numberOfLines={1} style={{ fontFamily: F.bold, fontSize: s(9.5), color: C.ink3 }}>
-                      {stats.runtime}
-                      {p.note ? ` · ${p.note}` : ''}
-                    </Text>
-                  </View>
-                </Press>
-              );
-            })}
-          </ScrollView>
+                      </Art>
+                      <Text
+                        numberOfLines={1}
+                        style={{ marginTop: s(7), fontFamily: F.extrabold, fontSize: s(11.5), color: C.ink }}>
+                        {p.name}
+                      </Text>
+                      <Text numberOfLines={1} style={{ fontFamily: F.bold, fontSize: s(9.5), color: C.ink3 }}>
+                        {stats.runtime}
+                      </Text>
+                    </View>
+                  </Press>
+                );
+              })}
+            </ScrollView>
+          )}
 
           <SectionLabel>Moods</SectionLabel>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(8) }}>
@@ -235,53 +245,38 @@ export default function SearchScreen() {
             ))}
           </View>
 
-          {/* `.ticker` */}
-          <Card
-            style={{
-              marginTop: s(10),
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: s(9),
-              paddingVertical: s(9),
-              paddingHorizontal: s(12),
-            }}>
-            <View
-              style={{
-                width: s(8),
-                height: s(8),
-                borderRadius: s(4),
-                backgroundColor: C.greenBright,
-              }}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: F.extrabold, fontSize: s(10.5), color: C.ink }}>
-                Luna Radio · Aero Channel
-              </Text>
-              <Text style={{ fontFamily: F.bold, fontSize: s(9), color: C.ink3 }}>
-                2,418 listening now
-              </Text>
-            </View>
-            <AeroButton label="Tune in" icon="play" variant="green" onPress={() => run('aero chill')} />
-          </Card>
+          {/* `.ticker` is gone. It advertised "Luna Radio · Aero Channel" with
+              "2,418 listening now" over a button that ran a text search for
+              "aero chill". There is no radio, no channel and no listener count
+              to report — it was a decorative lie, and the one piece of this
+              screen that could not be made true by pointing it at real data. */}
 
-          <SectionLabel action="History">Jump back in</SectionLabel>
-          <View style={{ gap: s(4) }}>
-            {history.map((h, i) => (
-              <QueueRow
-                key={h.track.id}
-                track={h.track}
-                note={h.note}
-                onPress={() =>
-                  play(
-                    history.map((x) => x.track),
-                    i,
-                    { kind: 'Playing from history', name: 'Jump back in' },
-                  )
-                }
-                onLongPress={() => promptAddToPlaylist(h.track)}
-              />
-            ))}
-          </View>
+          <SectionLabel>Jump back in</SectionLabel>
+          {history.length === 0 ? (
+            <Empty
+              icon="clock"
+              title="Nothing played yet"
+              hint="Songs you play show up here, newest first, on every device you sign in to."
+            />
+          ) : (
+            <View style={{ gap: s(4) }}>
+              {history.map((h, i) => (
+                <QueueRow
+                  key={h.track.id}
+                  track={h.track}
+                  note={h.note}
+                  onPress={() =>
+                    play(
+                      history.map((x) => x.track),
+                      i,
+                      { kind: 'Playing from history', name: 'Jump back in' },
+                    )
+                  }
+                  onLongPress={() => promptAddToPlaylist(h.track)}
+                />
+              ))}
+            </View>
+          )}
         </>
       )}
     </Screen>

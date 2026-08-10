@@ -1,9 +1,9 @@
 /**
  * "Add to playlist" prompt.
  *
- * Reachable by long-pressing any track row or search result. Only user-created
- * playlists can be added to — the four seeded ones are read-only demo chrome;
- * real playlists sync through Supabase.
+ * Reachable by long-pressing any track row or search result. Every playlist
+ * belongs to the signed-in account and syncs through Supabase, so all of them
+ * can be added to — this used to filter out four seeded read-only ones.
  */
 
 import { useState } from 'react';
@@ -24,7 +24,7 @@ export function AddToPlaylist() {
   const { playlists, createPlaylist, addToPlaylist } = useLibrary();
   const [name, setName] = useState('');
 
-  const mine = playlists.filter((p) => p.custom);
+  const mine = playlists;
 
   const close = () => {
     setName('');

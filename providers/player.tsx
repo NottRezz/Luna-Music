@@ -10,7 +10,6 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { SEED_TRACKS } from '@/constants/seed';
 import { useLibrary } from '@/providers/library';
 import { fromItunes, type Track } from '@/types/music';
 
@@ -145,11 +144,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const status = useAudioPlayerStatus(player);
   const { isFavorite, toggleFavorite, rememberPlay } = useLibrary();
 
-  // Seeded so the dock is populated on first launch, as it is in the mockup.
-  // Nothing is loaded or played until the user asks for it.
-  const [queue, setQueue] = useState<Track[]>(SEED_TRACKS);
-  const [index, setIndex] = useState(1);
-  const [source, setSource] = useState<Source>({ kind: 'Playing from playlist', name: 'Midnight Echoes' });
+  // Empty until something is played. This used to start as the mockup's eight
+  // demo tracks with index 1, so a brand new account launched into a dock
+  // already showing "Digital Rain" by an artist that does not exist. The dock
+  // renders nothing while `track` is undefined.
+  const [queue, setQueue] = useState<Track[]>([]);
+  const [index, setIndex] = useState(0);
+  const [source, setSource] = useState<Source>({ kind: 'Not playing', name: '—' });
   const [loading, setLoading] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState(false);
