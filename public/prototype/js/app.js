@@ -524,5 +524,15 @@
     return clone;
   }
 
-  window.Luna = { show: show, buildMock: buildMock };
+  // `play` and `catalogue` were added for the demo site's Search screen, which
+  // has to filter the same list this file plays from and then start playback on
+  // a result. Still a narrow surface: pick a screen, read the catalogue, play an
+  // index. Nothing else about the prototype is reachable from outside.
+  window.Luna = {
+    show: show,
+    buildMock: buildMock,
+    catalogue: function () { return ALL.slice(); },
+    play: function (i) { goto(i, true); },
+    playing: function () { return state.idx; },
+  };
 })();

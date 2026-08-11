@@ -274,20 +274,66 @@ export const SLIDES = [
       items: ['4 screens', '6 database tables', '30-second previews', '1 codebase, 2 platforms'],
     },
   },
+
+  /* The walkthrough. One slide per screen, each showing the screen it talks
+     about, so the phone is never illustrating something said two slides ago. */
   {
     kind: 'demo',
-    eyebrow: 'Live',
-    title: 'The app',
+    eyebrow: 'Walkthrough · 1 of 5',
+    title: 'Search',
     screen: 'search',
-    // Nothing here about the demo being a browser rather than a phone. That is
-    // a fact about our setup, not about the app, and volunteering it puts "so
-    // why aren't we seeing the real thing" into a room that was not asking.
     points: [
-      'Four screens: search, playlist, library, profile',
-      'Results come from Apple’s live catalogue, not a fixed list',
-      'One player shared by every tab, so audio survives navigation',
+      'Type a query and results replace the browse view',
+      'Results come from Apple’s catalogue, not a fixed list',
+      'The + on any row adds it to a playlist',
     ],
   },
+  {
+    kind: 'demo',
+    eyebrow: 'Walkthrough · 2 of 5',
+    title: 'Playlist',
+    screen: 'playlist',
+    points: [
+      'Every playlist belongs to your account',
+      'Track count and runtime update as you edit it',
+      'The bin removes a track — and says so',
+    ],
+  },
+  {
+    kind: 'demo',
+    eyebrow: 'Walkthrough · 3 of 5',
+    title: 'Library',
+    screen: 'library',
+    points: [
+      'Everything you have saved, in one place',
+      'Group it by song, album or artist',
+      'Filtering happens on the device, with no round trip',
+    ],
+  },
+  {
+    kind: 'demo',
+    eyebrow: 'Walkthrough · 4 of 5',
+    title: 'Profile',
+    screen: 'profile',
+    points: [
+      'Display name, username and email',
+      'Changing a password checks the current one first',
+      'The counts above are real rows, not decoration',
+    ],
+  },
+  {
+    kind: 'demo',
+    eyebrow: 'Walkthrough · 5 of 5',
+    title: 'Now playing',
+    screen: 'now',
+    points: [
+      'Artwork, scrubber and the queue behind it',
+      'Orange marks the playing row — the only warm colour in the app',
+      'The player keeps going as you move between tabs',
+    ],
+  },
+
+  /* The two choices that were actually ours to make. */
   {
     kind: 'compare',
     eyebrow: 'Decision',
@@ -311,75 +357,19 @@ export const SLIDES = [
     left: {
       label: 'Postgres, via Supabase',
       tone: 'good',
-      items: ['A song sits in many playlists — one join table', 'Auth and database in one service', 'Real SQL, real foreign keys'],
+      items: ['A song sits in many playlists — one join table', 'Auth and database in one service', 'Rules enforced by the database itself'],
     },
     right: {
       label: 'Firebase / Firestore',
       tone: 'bad',
       items: ['Documents, not tables', 'Copy each song per user', 'Keep those copies in sync by hand'],
     },
-    note: 'The cost: the security rules are Postgres-specific SQL.',
-  },
-  {
-    kind: 'points',
-    eyebrow: 'Decision',
-    title: 'The app’s database key is public',
-    points: [
-      'It ships inside the app, so anyone can pull it out',
-      'With it, they can query the database without our app',
-      'So a check in our code is a suggestion, not a rule',
-    ],
-    aside: {
-      label: 'What we did',
-      items: [
-        'Rules moved into the tables themselves',
-        'Postgres checks every request, from any client',
-        'Enabled on all 6 tables',
-      ],
-    },
-  },
-  {
-    kind: 'demo',
-    eyebrow: 'Live',
-    title: 'Now playing',
-    screen: 'now',
-    points: [
-      'Artwork, scrubber, queue — the full player',
-      'Orange marks the playing row, the only warm colour in the app',
-      'Built from a web mockup we wrote before any app code',
-    ],
-  },
-  {
-    kind: 'findings',
-    eyebrow: 'Security',
-    title: 'We audited our own database',
-    items: [
-      { state: 'fixed', text: 'Any account could rewrite any song — title, artist, audio — for everyone' },
-      { state: 'fixed', text: 'Any account could grant itself a PREMIUM plan' },
-      { state: 'fixed', text: 'One account could fill the shared song table' },
-      { state: 'fixed', text: 'Two database functions could be tricked into using the wrong tables' },
-      { state: 'open', text: 'A key committed early still needs rotating' },
-    ],
-    note: 'Five found, five fixed, one still open — and listed as open.',
-  },
-  {
-    kind: 'points',
-    eyebrow: 'What we changed',
-    title: 'We deleted a lot of our own work',
-    points: [
-      'Settings that stored a value and changed nothing',
-      'Starter playlists and a radio station that did not exist',
-      'A working feature nobody could find, because it was a hidden gesture',
-    ],
-    aside: {
-      label: 'The rule we settled on',
-      items: ['A control that lies is worse than no control', 'An empty account should look empty'],
-    },
+    note: 'The cost: the rules are Postgres-specific SQL.',
   },
   {
     kind: 'title',
     title: 'Luna Music',
-    subtitle: 'Source, write-up and this deck',
+    subtitle: 'Source and full write-up',
     note: 'github.com/NottRezz/Luna-Music',
   },
 ];

@@ -91,6 +91,7 @@
     // "Jump back in" on Search. The Up Next queue is deliberately left alone —
     // it has no add button in the app either.
     decorate(document.querySelectorAll('.view[data-view="search"] .q-item'), 'add');
+    wireSearch();
   }
 
   document.addEventListener(
@@ -119,6 +120,162 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
   else wire();
+
+  /* ------------------------------------------------------------------
+     Search
+
+     The mockup drew a search field and never wired it, because it only ever had
+     to be a picture. On the demo site Search is the first screen anyone opens
+     and a whole slide of the walkthrough, so a field that does nothing is the
+     most visible way the prototype can look unlike the app.
+
+     The app submits a query to the iTunes API and swaps the browse stack for
+     the results. This does the same against the mockup's own catalogue: same
+     swap, same row markup, same behaviour on an empty result.
+
+     Rows carry `data-idx` inside a `.tracks` container, which is exactly what
+     app.js's own renderTrack looks for when it marks the playing row — so the
+     orange highlight follows into these results with no extra bookkeeping.
+     ------------------------------------------------------------------ */
+
+  function mmss(sec) {
+    var n = Math.max(0, Math.round(sec));
+    return Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0');
+  }
+
+  function esc(text) {
+    var d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+  }
+
+  function searchView() {
+    return document.querySelector('.view[data-view="search"]');
+  }
+
+  function browseNodes() {
+    // Everything below the field: what the app replaces when results arrive.
+    var view = searchView();
+    if (!view) return [];
+    return Array.prototype.filter.call(view.children, function (el) {
+      return !el.classList.contains('search-row') && !el.classList.contains('results');
+    });
+  }
+
+  function clearResults() {
+    var view = searchView();
+    if (!view) return;
+    var old = view.querySelector('.results');
+    if (old) old.remove();
+    browseNodes().forEach(function (el) {
+      el.hidden = false;
+    });
+  }
+
+  function runSearch(term) {
+    var view = searchView();
+    if (!view) return;
+    var q = term.trim().toLowerCase();
+    if (!q) return clearResults();
+
+    var all = window.Luna && window.Luna.catalogue ? window.Luna.catalogue() : [];
+    var hits = [];
+    all.forEach(function (tr, i) {
+      if (tr.t.toLowerCase().indexOf(q) !== -1 || tr.a.toLowerCase().indexOf(q) !== -1) {
+        hits.push({ tr: tr, i: i });
+      }
+    });
+
+    browseNodes().forEach(function (el) {
+      el.hidden = true;
+    });
+
+    var old = view.querySelector('.results');
+    if (old) old.remove();
+
+    var wrap = document.createElement('div');
+    wrap.className = 'results';
+
+    var label = document.createElement('div');
+    label.className = 'section-label';
+    label.innerHTML = hits.length
+      ? 'Results · ' + hits.length + ' <span class="results__clear">Clear</span>'
+      : 'Results <span class="results__clear">Clear</span>';
+    wrap.appendChild(label);
+
+    if (!hits.length) {
+      var empty = document.createElement('div');
+      empty.className = 'results__empty';
+      empty.innerHTML =
+        '<b>Nothing matched “' + esc(term.trim()) + '”</b><span>Try a different word.</span>';
+      wrap.appendChild(empty);
+    } else {
+      var list = document.createElement('div');
+      list.className = 'tracks';
+      hits.forEach(function (hit, n) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'track';
+        btn.dataset.idx = hit.i;
+        btn.innerHTML =
+          '<span class="track__idx"><em>' + (n + 1) + '</em>' +
+          '<span class="eq"><i></i><i></i><i></i><i></i></span></span>' +
+          '<span class="art art--' + hit.tr.art + '"></span>' +
+          '<span class="track__meta"><b>' + esc(hit.tr.t) + '</b><span>' + esc(hit.tr.a) + '</span></span>' +
+          '<span class="track__dur">' + mmss(hit.tr.d) + '</span>';
+        list.appendChild(btn);
+      });
+      wrap.appendChild(list);
+    }
+
+    view.appendChild(wrap);
+
+    // Match the row that is already playing, then hand the rest to app.js.
+    var now = window.Luna && window.Luna.playing ? window.Luna.playing() : -1;
+    wrap.querySelectorAll('.track').forEach(function (row) {
+      row.classList.toggle('is-current', +row.dataset.idx === now);
+    });
+    decorate(wrap.querySelectorAll('.track'), 'add');
+  }
+
+  function wireSearch() {
+    var view = searchView();
+    if (!view) return;
+    var input = view.querySelector('input[type="search"]');
+    var button = view.querySelector('.ai-btn');
+    if (!input) return;
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      runSearch(input.value);
+    });
+    input.addEventListener('input', function () {
+      if (!input.value.trim()) clearResults();
+    });
+    if (button) button.addEventListener('click', function () { runSearch(input.value); });
+
+    view.addEventListener('click', function (e) {
+      if (e.target.closest('.results__clear')) {
+        input.value = '';
+        clearResults();
+        return;
+      }
+      var row = e.target.closest('.results .track');
+      if (row && window.Luna && window.Luna.play) window.Luna.play(+row.dataset.idx);
+    });
+
+    // Tapping a recent chip searches for it, as it does in the app.
+    var chips = document.getElementById('recentChips');
+    if (chips) {
+      chips.addEventListener('click', function (e) {
+        var chip = e.target.closest('.chip');
+        if (!chip) return;
+        input.value = chip.textContent.trim();
+        runSearch(input.value);
+      });
+    }
+  }
 
   /* ------------------------------------------------------------------
      Keyboard escape hatch

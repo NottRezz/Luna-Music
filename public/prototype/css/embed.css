@@ -101,6 +101,46 @@ body.is-embed {
 }
 
 /* ============================================================
+   Search results
+
+   The mockup drew the field but never wired it. These are the few styles the
+   results need that the mockup did not already have — the rows themselves are
+   `.track`, so they inherit everything, including the orange playing state.
+   ============================================================ */
+
+/* The mockup sets an explicit `display` on section labels, chip rows and card
+   rails, and an explicit display beats the `hidden` attribute — so hiding the
+   browse stack by setting `hidden` left it on screen underneath the results.
+   This is the one place the embed has to out-specify the vendored stylesheet. */
+.view [hidden] {
+  display: none !important;
+}
+
+.results__clear {
+  cursor: pointer;
+}
+
+.results__empty {
+  display: grid;
+  gap: 4px;
+  padding: 22px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(126, 159, 196, 0.28);
+  text-align: center;
+}
+
+.results__empty b {
+  font-size: 12.5px;
+  color: #14315e;
+}
+
+.results__empty span {
+  font-size: 11px;
+  color: #7e9fc4;
+}
+
+/* ============================================================
    Confirmation
 
    The app answers every add and remove with a toast, because the sheet closes
