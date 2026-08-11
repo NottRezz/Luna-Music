@@ -1,5 +1,86 @@
--- Quick verification queries after applying 20260810000000_luna_schema.sql
--- Run while signed in as a test user (or use the service role carefully).
+-- Verification queries for the Luna schema and its security hardening.
+--
+-- ===========================================================================
+-- RUN THIS ONE. Everything below it is the same checks, one at a time.
+-- ===========================================================================
+-- The Supabase SQL editor renders a single result grid per run, so executing
+-- this whole file only ever shows you the LAST statement — the other checks run
+-- and their output is discarded. That is a good way to believe you verified
+-- something you did not look at.
+--
+-- This block collapses every check into one table: one row each, PASS or FAIL,
+-- failures sorted to the top. Paste just this and read the first column.
+-- ===========================================================================
+with checks as (
+  select 1 as ord, 'RLS enabled on all six tables' as check_name,
+    (select count(*) from pg_class
+      where relnamespace = 'public'::regnamespace
+        and relname in ('profiles','tracks','playlists','playlist_tracks','favorites','recently_played')
+        and relrowsecurity)::text as got,
+    '6' as want
+
+  union all select 2, 'Sign-up trigger exists',
+    (select count(*) from pg_trigger where tgname = 'on_auth_user_created')::text, '1'
+
+  union all select 3, 'LM-6  tracks has no UPDATE policy',
+    (select count(*) from pg_policies
+      where schemaname = 'public' and tablename = 'tracks' and cmd = 'UPDATE')::text, '0'
+
+  union all select 4, 'LM-4  trigger folds case before stripping',
+    (select (pg_get_functiondef('public.handle_new_user'::regproc)
+             like '%lower(split_part(%'))::text, 'true'
+
+  union all select 5, 'LM-4  legacy mangled usernames (decision owed, not a failure)',
+    (select count(*) from public.profiles p
+       join auth.users u on u.id = p.id
+      where u.email is not null
+        and p.username = lower(regexp_replace(split_part(u.email,'@',1),'[^a-z0-9_]','','g'))
+        and p.username is distinct from
+            regexp_replace(lower(split_part(u.email,'@',1)),'[^a-z0-9_]','','g'))::text, '0'
+
+  union all select 6, 'LM-23 artwork urls off *.mzstatic.com',
+    (select count(*) from public.tracks
+      where artwork_url is not null
+        and artwork_url !~ '^https://[a-z0-9-]+(\.[a-z0-9-]+)*\.mzstatic\.com/')::text, '0'
+
+  union all select 7, 'LM-23 preview urls off *.apple.com',
+    (select count(*) from public.tracks
+      where preview_url is not null
+        and preview_url !~ '^https://[a-z0-9-]+(\.[a-z0-9-]+)*\.apple\.com/')::text, '0'
+
+  union all select 8, 'LM-23 both url CHECK constraints present',
+    (select count(*) from pg_constraint
+      where conrelid = 'public.tracks'::regclass
+        and conname in ('tracks_artwork_url_host','tracks_preview_url_host'))::text, '2'
+
+  union all select 9, 'LM-24 columns authenticated may update on profiles',
+    (select coalesce(string_agg(column_name, ',' order by column_name), '(none)')
+       from information_schema.column_privileges
+      where table_schema = 'public' and table_name = 'profiles'
+        and grantee = 'authenticated' and privilege_type = 'UPDATE'),
+    'avatar_art,display_name,username'
+
+  union all select 10, 'LM-25 insert quota trigger present',
+    (select count(*) from pg_trigger
+      where tgrelid = 'public.tracks'::regclass and tgname = 'tracks_insert_quota')::text, '1'
+
+  union all select 11, 'LM-26 security definer functions with no pinned search_path',
+    (select count(*) from pg_proc p
+       join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.prosecdef
+        and (p.proconfig is null
+             or not exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')))::text, '0'
+)
+select case when got = want then 'PASS' else 'FAIL' end as status,
+       check_name,
+       got as actual,
+       want as expected
+from checks
+order by (got = want), ord;
+
+-- ===========================================================================
+-- Individual checks, if something above fails and you want the detail.
+-- ===========================================================================
 
 -- Expect RLS enabled on every public table we own:
 select relname, relrowsecurity
