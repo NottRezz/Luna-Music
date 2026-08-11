@@ -137,6 +137,7 @@ export default function SearchScreen() {
                   playing={playing}
                   onPress={() => play(results, i, { kind: 'Playing from search', name: query })}
                   onLongPress={() => promptAddToPlaylist(t)}
+                  onAdd={() => promptAddToPlaylist(t)}
                 />
               ))}
             </View>
@@ -162,7 +163,7 @@ export default function SearchScreen() {
             <Empty
               icon="list"
               title="No playlists yet"
-              hint="Search for a song, then press and hold it to start one."
+              hint="Search for a song, then tap the + beside it to start one."
             />
           ) : (
             <ScrollView
@@ -246,6 +247,7 @@ export default function SearchScreen() {
                     )
                   }
                   onLongPress={() => promptAddToPlaylist(h.track)}
+                  onAdd={() => promptAddToPlaylist(h.track)}
                 />
               ))}
             </View>

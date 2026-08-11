@@ -1,7 +1,9 @@
 /**
  * "Add to playlist" prompt.
  *
- * Reachable by long-pressing any track row or search result. Every playlist
+ * Opened by the "+" on any track row or search result, or by long-pressing the
+ * row — the gesture is kept as a shortcut for people who learned it, but the
+ * button is the path anyone actually finds. Every playlist
  * belongs to the signed-in account and syncs through Supabase, so all of them
  * can be added to — this used to filter out four seeded read-only ones.
  */
@@ -33,12 +35,29 @@ export function AddToPlaylist() {
     dismissAddToPlaylist();
   };
 
+  /**
+   * Both paths confirm. The sheet closes immediately either way — waiting on
+   * the round trip would leave it sitting there looking stuck — so the toast is
+   * the only thing that tells you it worked, and "it silently did nothing" was
+   * the whole complaint about this feature.
+   */
   const add = (playlistId: string) => {
     if (!pendingTrack) return;
-    void addToPlaylist(playlistId, pendingTrack).catch((err) => {
-      console.warn('addToPlaylist failed:', err);
-      notify('Could not add that song to the playlist.');
-    });
+    const to = mine.find((p) => p.id === playlistId);
+    const already = to?.trackIds.includes(pendingTrack.id);
+    void addToPlaylist(playlistId, pendingTrack)
+      .then(() =>
+        notify(
+          already
+            ? `Already in ${to?.name ?? 'that playlist'}.`
+            : `Added to ${to?.name ?? 'playlist'}.`,
+          'info',
+        ),
+      )
+      .catch((err) => {
+        console.warn('addToPlaylist failed:', err);
+        notify('Could not add that song to the playlist.');
+      });
     close();
   };
 
@@ -46,10 +65,14 @@ export function AddToPlaylist() {
     const trimmed = name.trim();
     if (!trimmed || !pendingTrack) return;
     const track = pendingTrack;
+    close();
     void createPlaylist(trimmed)
       .then((id) => addToPlaylist(id, track))
-      .then(() => close())
-      .catch((err) => console.warn('createAndAdd failed:', err));
+      .then(() => notify(`Added to ${trimmed}.`, 'info'))
+      .catch((err) => {
+        console.warn('createAndAdd failed:', err);
+        notify('Could not create that playlist.');
+      });
   };
 
   const insets = useSafeAreaInsets();

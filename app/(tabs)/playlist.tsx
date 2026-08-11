@@ -34,7 +34,7 @@ export default function PlaylistScreen() {
         <Empty
           icon="list"
           title="No playlists yet"
-          hint="Find a song in Search, press and hold it, and you can start your first playlist from there."
+          hint="Find a song in Search, tap the + beside it, and you can start your first playlist from there."
         />
         <AeroButton
           label="New playlist"
@@ -45,6 +45,14 @@ export default function PlaylistScreen() {
       </Screen>
     );
   }
+
+  const remove = (t: { id: string; title: string }) =>
+    void removeFromPlaylist(activePlaylist.id, t.id)
+      .then(() => notify(`Removed “${t.title}”.`, 'info'))
+      .catch((err) => {
+        console.warn('removeFromPlaylist failed:', err);
+        notify('Could not remove that song.');
+      });
 
   const tracks = tracksOf(activePlaylist);
   const stats = statsOf(activePlaylist);
@@ -108,7 +116,7 @@ export default function PlaylistScreen() {
         <Empty
           icon="note"
           title="This playlist is empty"
-          hint="Search for a song, then press and hold it to add it here."
+          hint="Search for a song, then tap the + beside it to add it here."
         />
       ) : (
         <View style={{ gap: s(4) }}>
@@ -120,15 +128,11 @@ export default function PlaylistScreen() {
               current={current?.id === t.id}
               playing={playing}
               onPress={() => play(tracks, i, source)}
-              // Every playlist is the account's own now, so long-press always
-              // means remove. It used to branch on `custom` because the seeded
-              // ones could not be edited.
-              onLongPress={() =>
-                void removeFromPlaylist(activePlaylist.id, t.id).catch((err) => {
-                  console.warn('removeFromPlaylist failed:', err);
-                  notify('Could not remove that song.');
-                })
-              }
+              // Every playlist is the account's own now, so removal always
+              // applies. It used to branch on `custom` because the seeded ones
+              // could not be edited.
+              onLongPress={() => remove(t)}
+              onRemove={() => remove(t)}
             />
           ))}
         </View>
