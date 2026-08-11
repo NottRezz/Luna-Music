@@ -14,6 +14,20 @@ import { SLIDES } from './content.js';
  * Keyboard is the primary control because that is what a presenter has —
  * arrows, space, Home/End, Escape. Clicking the halves works for a touchscreen.
  */
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  else document.documentElement.requestFullscreen?.().catch(() => {});
+}
+
+function Head({ slide }) {
+  return (
+    <>
+      {slide.eyebrow ? <p className="slide__eyebrow">{slide.eyebrow}</p> : null}
+      <h2>{slide.title}</h2>
+    </>
+  );
+}
+
 export default function Present({ onExit, prototypeSrc }) {
   const [i, setI] = useState(0);
   const [hint, setHint] = useState(true);
@@ -24,9 +38,7 @@ export default function Present({ onExit, prototypeSrc }) {
   }, []);
 
   useEffect(() => {
-    function onKey(e) {
-      // Let the browser have its own shortcuts.
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+    function handle(key) {
       const keys = {
         ArrowRight: () => go((n) => n + 1),
         ArrowDown: () => go((n) => n + 1),
@@ -38,20 +50,36 @@ export default function Present({ onExit, prototypeSrc }) {
         Home: () => go(0),
         End: () => go(SLIDES.length - 1),
         Escape: onExit,
-        f: () => {
-          const el = document.documentElement;
-          if (document.fullscreenElement) document.exitFullscreen?.();
-          else el.requestFullscreen?.().catch(() => {});
-        },
+        f: toggleFullscreen,
+        F: toggleFullscreen,
       };
-      const fn = keys[e.key];
-      if (!fn) return;
-      e.preventDefault();
+      const fn = keys[key];
+      if (!fn) return false;
       setHint(false);
       fn();
+      return true;
     }
+
+    function onKey(e) {
+      // Let the browser have its own shortcuts.
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (handle(e.key)) e.preventDefault();
+    }
+
+    // Keys pressed inside the prototype are forwarded out by its embed script,
+    // because an iframe keeps its own key events. Without this the deck stops
+    // responding to arrows the moment somebody clicks the phone.
+    function onMessage(e) {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type === 'luna:key') handle(e.data.key);
+    }
+
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('message', onMessage);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('message', onMessage);
+    };
   }, [go, onExit]);
 
   // The deck owns the whole viewport; letting the page behind it scroll means
@@ -107,21 +135,69 @@ export default function Present({ onExit, prototypeSrc }) {
         ) : slide.kind === 'demo' ? (
           <div className="slide slide--demo">
             <div>
-              {slide.eyebrow ? <p className="slide__eyebrow">{slide.eyebrow}</p> : null}
-              <h2>{slide.title}</h2>
-              {slide.note ? <p className="slide__sub">{slide.note}</p> : null}
+              <Head slide={slide} />
+              {slide.points ? (
+                <ul className="slide__bullets">
+                  {slide.points.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
             <Device src={prototypeSrc} screen={slide.screen} title={`Luna Music — ${slide.title}`} compact />
           </div>
-        ) : (
-          <div className="slide slide--points">
-            {slide.eyebrow ? <p className="slide__eyebrow">{slide.eyebrow}</p> : null}
-            <h2>{slide.title}</h2>
-            <ul>
-              {slide.points.map((p) => (
-                <li key={p}>{p}</li>
+        ) : slide.kind === 'compare' ? (
+          <div className="slide slide--compare">
+            <Head slide={slide} />
+            <div className="compare">
+              {[slide.left, slide.right].map((side) => (
+                <div className={`compare__col compare__col--${side.tone}`} key={side.label}>
+                  <p className="compare__label">{side.label}</p>
+                  <ul>
+                    {side.items.map((it) => (
+                      <li key={it}>{it}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            {slide.note ? <p className="slide__foot">{slide.note}</p> : null}
+          </div>
+        ) : slide.kind === 'findings' ? (
+          <div className="slide slide--findings">
+            <Head slide={slide} />
+            <ul className="findings">
+              {slide.items.map((f) => (
+                <li key={f.text}>
+                  <span className={`findings__pill findings__pill--${f.state}`}>
+                    {f.state === 'fixed' ? 'Fixed' : 'Open'}
+                  </span>
+                  <span>{f.text}</span>
+                </li>
               ))}
             </ul>
+            {slide.note ? <p className="slide__foot">{slide.note}</p> : null}
+          </div>
+        ) : (
+          <div className={slide.aside ? 'slide slide--points slide--split' : 'slide slide--points'}>
+            <div>
+              <Head slide={slide} />
+              <ul className="slide__bullets">
+                {slide.points.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </div>
+            {slide.aside ? (
+              <aside className="aside">
+                <p className="aside__label">{slide.aside.label}</p>
+                <ul>
+                  {slide.aside.items.map((it) => (
+                    <li key={it}>{it}</li>
+                  ))}
+                </ul>
+              </aside>
+            ) : null}
           </div>
         )}
       </div>

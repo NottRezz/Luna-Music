@@ -352,10 +352,27 @@ section:first-of-type {
    Device
    ============================================================ */
 
+/*
+   The frame must hand the prototype its authored viewport, then scale.
+
+   The mockup is written against a 372x780 phone — `--phone-w` and `--phone-h`
+   in its own stylesheet — and its layout is largely fixed to those numbers.
+   Sizing the iframe to fit the frame instead gave it a 326px-wide viewport, so
+   the interface rendered at full height in seven eighths of its width and came
+   out visibly narrow: wrong next to the same app in an emulator.
+
+   So the iframe is always exactly 372x780 CSS pixels, and `transform: scale()`
+   resizes the rendered result. Scaling cannot distort what it draws, which is
+   the point — every size below is one number, and the proportions are fixed.
+   The bezel is 9px at 1x and does not scale with the screen, so it is added
+   outside the scaled box rather than as padding on it.
+*/
 .device {
-  --device-w: 344px;
-  --device-h: 722px;
-  width: var(--device-w);
+  --pw: 372;
+  --ph: 780;
+  --s: 0.88;
+  --bezel: 9px;
+  width: calc(var(--pw) * 1px * var(--s) + var(--bezel) * 2);
   max-width: 100%;
   flex: none;
   justify-self: center;
@@ -364,10 +381,8 @@ section:first-of-type {
 .device__shell {
   position: relative;
   width: 100%;
-  height: var(--device-h);
-  max-height: 78vh;
+  height: calc(var(--ph) * 1px * var(--s) + var(--bezel) * 2);
   border-radius: 34px;
-  padding: 9px;
   background: linear-gradient(160deg, #f2f8ff 0%, #cadcf0 38%, #9fb9d6 72%, #e7f1fb 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
@@ -377,13 +392,39 @@ section:first-of-type {
 }
 
 .device__screen {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  top: var(--bezel);
+  left: var(--bezel);
+  width: calc(var(--pw) * 1px);
+  height: calc(var(--ph) * 1px);
+  transform: scale(var(--s));
+  transform-origin: top left;
   border: 0;
   border-radius: 26px;
   display: block;
   background: #eaf3ff;
   overflow: hidden;
+}
+
+/* Narrow screens: fit the width available rather than overflowing it. 340px of
+   viewport still leaves the frame room to breathe at this scale. */
+@media (max-width: 460px) {
+  .device {
+    --s: 0.78;
+  }
+}
+
+/* Short viewports would otherwise push the dock below the fold. */
+@media (max-height: 840px) and (min-width: 941px) {
+  .device {
+    --s: 0.8;
+  }
+}
+
+@media (max-height: 760px) and (min-width: 941px) {
+  .device {
+    --s: 0.72;
+  }
 }
 
 .device__hint {
@@ -947,32 +988,195 @@ section:first-of-type {
   max-width: 34ch;
 }
 
-.slide--points ul {
-  margin: clamp(22px, 4vh, 44px) 0 0;
+.slide__bullets {
+  margin: clamp(20px, 3.4vh, 38px) 0 0;
   padding: 0;
   list-style: none;
   display: grid;
-  gap: clamp(12px, 2.2vh, 22px);
+  gap: clamp(11px, 1.9vh, 19px);
 }
 
-.slide--points li {
-  font-size: clamp(17px, 2.5vw, 30px);
+.slide__bullets li {
+  font-size: clamp(16px, 2.1vw, 26px);
   line-height: 1.34;
   color: #cfdcec;
-  padding-left: clamp(20px, 2.6vw, 34px);
+  padding-left: clamp(19px, 2.4vw, 31px);
   position: relative;
-  max-width: 34ch;
+  max-width: 36ch;
 }
 
-.slide--points li::before {
+.slide__bullets li::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 0.55em;
-  width: clamp(8px, 1vw, 12px);
-  height: clamp(8px, 1vw, 12px);
+  top: 0.56em;
+  width: clamp(8px, 0.9vw, 11px);
+  height: clamp(8px, 0.9vw, 11px);
   border-radius: 999px;
   background: #ff8c1a;
+}
+
+.slide__foot {
+  margin: clamp(18px, 3vh, 32px) 0 0;
+  font-size: clamp(14px, 1.5vw, 19px);
+  color: #8ba3c0;
+}
+
+/* A supporting column: the specifics that make a claim checkable, without
+   turning the slide into a paragraph. */
+.slide--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: clamp(24px, 4vw, 60px);
+  align-items: start;
+}
+
+.aside {
+  border-left: 2px solid rgba(110, 168, 255, 0.35);
+  padding-left: clamp(16px, 2vw, 26px);
+  margin-top: clamp(30px, 6vh, 62px);
+}
+
+.aside__label {
+  font-family: var(--font-app);
+  font-weight: 800;
+  font-size: clamp(10px, 1.1vw, 12.5px);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6ea8ff;
+  margin-bottom: 14px;
+}
+
+.aside ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: clamp(9px, 1.5vh, 15px);
+}
+
+.aside li {
+  font-size: clamp(14px, 1.55vw, 19px);
+  line-height: 1.35;
+  color: #a8bdd8;
+}
+
+/* Two options side by side. The chosen one is not merely first — colour does
+   the work, so a glance answers "which did they pick" before any reading. */
+.compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(16px, 2.6vw, 34px);
+  margin-top: clamp(22px, 4vh, 42px);
+}
+
+.compare__col {
+  border-radius: 16px;
+  padding: clamp(16px, 2.2vw, 26px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.compare__col--good {
+  border-color: rgba(95, 201, 95, 0.4);
+  background: rgba(95, 201, 95, 0.09);
+}
+
+.compare__col--bad {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.compare__label {
+  font-weight: 700;
+  font-size: clamp(15px, 1.8vw, 22px);
+  margin-bottom: clamp(12px, 1.8vh, 18px);
+  color: #eef3fa;
+}
+
+.compare__col--good .compare__label {
+  color: #8fe08f;
+}
+
+.compare__col--bad .compare__label {
+  color: #93a9c6;
+}
+
+.compare ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: clamp(8px, 1.3vh, 14px);
+}
+
+.compare li {
+  font-size: clamp(13.5px, 1.5vw, 19px);
+  line-height: 1.34;
+  color: #c3d3e6;
+  padding-left: 17px;
+  position: relative;
+}
+
+.compare li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+@media (max-width: 720px) {
+  .slide--split,
+  .compare {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .aside {
+    margin-top: 8px;
+  }
+}
+
+/* Findings read as a status list, so the state leads each line. */
+.findings {
+  margin: clamp(20px, 3.6vh, 38px) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: clamp(10px, 1.7vh, 17px);
+}
+
+.findings li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: clamp(11px, 1.4vw, 18px);
+  align-items: baseline;
+  font-size: clamp(14px, 1.75vw, 22px);
+  line-height: 1.32;
+  color: #cfdcec;
+}
+
+.findings__pill {
+  font-family: var(--font-app);
+  font-weight: 800;
+  font-size: clamp(9.5px, 1vw, 12px);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.findings__pill--fixed {
+  background: rgba(95, 201, 95, 0.18);
+  color: #7fd67f;
+}
+
+.findings__pill--open {
+  background: rgba(240, 179, 84, 0.18);
+  color: #f0b354;
 }
 
 .slide--demo {
@@ -991,18 +1195,27 @@ section:first-of-type {
   }
 }
 
+/* The deck gives the phone less height than the page does, so it takes a
+   smaller scale — same 372x780 viewport inside, drawn smaller. */
 .device--compact {
-  --device-w: min(310px, 30vw);
-  --device-h: min(660px, 72vh);
+  --s: 0.74;
 }
 
-.device--compact .device__shell {
-  max-height: 72vh;
-}
-
-@media (max-width: 880px), (max-height: 620px) {
+@media (max-height: 880px) {
   .device--compact {
-    --device-w: min(300px, 74vw);
+    --s: 0.66;
+  }
+}
+
+@media (max-height: 780px) {
+  .device--compact {
+    --s: 0.58;
+  }
+}
+
+@media (max-height: 680px) {
+  .device--compact {
+    --s: 0.5;
   }
 }
 

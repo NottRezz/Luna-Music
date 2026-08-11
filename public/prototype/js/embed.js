@@ -120,5 +120,30 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
   else wire();
 
+  /* ------------------------------------------------------------------
+     Keyboard escape hatch
+
+     Key events raised inside an iframe never reach the parent document. In
+     presentation mode that means the moment a presenter clicks the phone to
+     demo something — which is the entire reason the phone is on the slide —
+     the arrow keys stop advancing the deck, with nothing on screen to explain
+     why.
+
+     So navigation keys are forwarded out. Only these: anything else belongs to
+     whatever the reader is doing inside the prototype.
+     ------------------------------------------------------------------ */
+
+  var FORWARD = ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', ' ', 'Home', 'End', 'Escape', 'f', 'F'];
+
+  window.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (FORWARD.indexOf(e.key) === -1) return;
+    // Typing in the prototype's own search box should stay in it.
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+    e.preventDefault();
+    post({ type: 'luna:key', key: e.key });
+  });
+
   post({ type: 'luna:ready' });
 })();

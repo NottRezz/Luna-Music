@@ -115,19 +115,6 @@ export const TECH = [
       'Policies are easy to get subtly wrong and the failure is silent — a too-permissive policy looks identical to a correct one until someone tests it. That is what the audit was for.',
   },
   {
-    id: 'expo',
-    tag: 'Client',
-    title: 'Why Expo and React Native',
-    instead: 'instead of native Swift and Kotlin',
-    body: [
-      'One codebase covers iOS and Android, which for a team of four is the difference between building the app twice and building it once.',
-      'Expo Go matters for a project that has to be handed in and demonstrated: anyone can run it by scanning a QR code, with no Xcode, no Android Studio and no signing certificates.',
-      'The pieces Luna needs are first-party Expo modules — secure storage, audio, gradients, routing — so there is no bridging code to write or maintain.',
-    ],
-    tradeoff:
-      'You are limited to what the managed workflow supports. Anything needing a custom native module means leaving Expo Go behind for a development build.',
-  },
-  {
     id: 'audio',
     tag: 'Playback',
     title: 'Why expo-audio',
@@ -199,7 +186,7 @@ export const STACK = [
   {
     kind: 'Client',
     name: 'Expo · React Native',
-    body: 'SDK 54 on React Native 0.81 and React 19, routed with Expo Router. Playback is expo-audio; the queue lives in a provider mounted above the router so it survives navigation.',
+    body: 'SDK 54 on React Native 0.81 and React 19, routed with Expo Router. The stack was set by the course rather than chosen, which is why it is listed here and not argued for above. Playback is expo-audio; the queue lives in a provider mounted above the router so it survives navigation.',
   },
   {
     kind: 'Catalogue',
@@ -254,106 +241,142 @@ export const HARDENING = [
 /**
  * Presentation mode.
  *
- * A different medium with different rules: this is read from across a room
- * while somebody talks over it, so each slide carries a headline and at most
- * three short lines. Anything needing a paragraph belongs on the page, not
- * here. The speaker supplies the detail; the slide supplies the anchor.
+ * Read from across a room while somebody talks over it, so every line stays
+ * short. Two rules shaped this list.
+ *
+ * Say only what was actually decided. Expo and React Native were set by the
+ * course, so a slide defending them argues with nobody. What is left is the
+ * handful of places where there were real options and we picked one.
+ *
+ * Describe, do not sell. It is a music player. Claiming more than that invites
+ * the obvious question about what makes it special, and there is no answer to
+ * that worth giving. The interesting part is not the idea, it is what the build
+ * ran into.
  */
 export const SLIDES = [
   {
     kind: 'title',
     title: 'Luna Music',
-    subtitle: 'A cross-platform music player built to a Frutiger Aero design',
+    subtitle: 'A music player for iOS and Android',
     note: 'CPRG 303-B · SPHR Studios',
   },
   {
     kind: 'points',
-    eyebrow: 'The idea',
-    title: 'Search anything. Keep what you like.',
+    eyebrow: 'What it does',
+    title: 'Search, play, keep',
     points: [
-      'Search a real music catalogue',
-      'Play it, save it, organise it into playlists',
-      'Your library follows your account, not your phone',
+      'Search a real catalogue and play what you find',
+      'Save songs and sort them into playlists',
+      'Sign in anywhere and your library is already there',
     ],
+    aside: {
+      label: 'By the numbers',
+      items: ['4 screens', '6 database tables', '30-second previews', '1 codebase, 2 platforms'],
+    },
   },
   {
     kind: 'demo',
     eyebrow: 'Live',
     title: 'The app',
     screen: 'search',
-    note: 'Running here in the browser — this is the real interface, not a video.',
-  },
-  {
-    kind: 'points',
-    eyebrow: 'Decision 1',
-    title: 'iTunes API, not Spotify',
     points: [
-      'No API key — nothing secret ships to the device',
-      'Spotify playback needs Premium for every user',
-      'Cost: thirty-second previews only',
+      'Running in the browser — the real interface, not a video',
+      'One player shared by every tab, so audio survives navigation',
+      'A new account starts empty; nothing here is pre-filled',
     ],
   },
   {
-    kind: 'points',
-    eyebrow: 'Decision 2',
-    title: 'Supabase, not Firebase',
-    points: [
-      'The data is relational — playlists and tracks are many-to-many',
-      'Auth and database in one, no API layer to write',
-      'Cost: the rules are Postgres-specific',
-    ],
+    kind: 'compare',
+    eyebrow: 'Decision',
+    title: 'Where the music comes from',
+    left: {
+      label: 'iTunes Search API',
+      tone: 'good',
+      items: ['No API key to ship or leak', 'Plain MP3 preview per track', 'Works for anyone, no account'],
+    },
+    right: {
+      label: 'Spotify Web API',
+      tone: 'bad',
+      items: ['Needs a key and a login flow', 'Playback needs their SDK', 'Every listener needs Premium'],
+    },
+    note: 'The cost: thirty-second previews, not full songs.',
+  },
+  {
+    kind: 'compare',
+    eyebrow: 'Decision',
+    title: 'Where the data lives',
+    left: {
+      label: 'Postgres, via Supabase',
+      tone: 'good',
+      items: ['A song sits in many playlists — one join table', 'Auth and database in one service', 'Real SQL, real foreign keys'],
+    },
+    right: {
+      label: 'Firebase / Firestore',
+      tone: 'bad',
+      items: ['Documents, not tables', 'Copy each song per user', 'Keep those copies in sync by hand'],
+    },
+    note: 'The cost: the security rules are Postgres-specific SQL.',
   },
   {
     kind: 'points',
-    eyebrow: 'Decision 3',
-    title: 'Security lives in the database',
+    eyebrow: 'Decision',
+    title: 'The app’s database key is public',
     points: [
-      'The app’s key ships to the device, so it can be extracted',
-      'A rule in the app is a filter; a rule in the table is a permission',
-      'Every query is checked, whatever client sent it',
+      'It ships inside the app, so anyone can pull it out',
+      'With it, they can query the database without our app',
+      'So a check in our code is a suggestion, not a rule',
     ],
-  },
-  {
-    kind: 'points',
-    eyebrow: 'Decision 4',
-    title: 'Expo, not native twice',
-    points: [
-      'One codebase for iOS and Android',
-      'Runs from a QR code — no Xcode, no signing',
-      'Cost: custom native code means leaving Expo Go',
-    ],
+    aside: {
+      label: 'What we did',
+      items: [
+        'Rules moved into the tables themselves',
+        'Postgres checks every request, from any client',
+        'Enabled on all 6 tables',
+      ],
+    },
   },
   {
     kind: 'demo',
     eyebrow: 'Live',
     title: 'Now playing',
     screen: 'now',
-    note: 'Persistent playback, a real queue, and one warm accent in a cool interface.',
+    points: [
+      'Artwork, scrubber, queue — the full player',
+      'Orange marks the playing row, the only warm colour in the app',
+      'Built from a web mockup we wrote before any app code',
+    ],
   },
   {
-    kind: 'points',
-    eyebrow: 'What we found',
+    kind: 'findings',
+    eyebrow: 'Security',
     title: 'We audited our own database',
-    points: [
-      'One shared table let any account rewrite any song for everyone',
-      'Every account could grant itself PREMIUM',
-      'Five issues found, five closed, one still open',
+    items: [
+      { state: 'fixed', text: 'Any account could rewrite any song — title, artist, audio — for everyone' },
+      { state: 'fixed', text: 'Any account could grant itself a PREMIUM plan' },
+      { state: 'fixed', text: 'One account could fill the shared song table' },
+      { state: 'fixed', text: 'Two database functions could be tricked into using the wrong tables' },
+      { state: 'open', text: 'A key committed early still needs rotating' },
     ],
+    note: 'Five found, five fixed, one still open — and listed as open.',
   },
   {
     kind: 'points',
-    eyebrow: 'What we learned',
-    title: 'A control that lies is worse than none',
+    eyebrow: 'What we changed',
+    title: 'We deleted a lot of our own work',
     points: [
-      'Removed settings that stored a value and did nothing',
-      'Removed seeded content that faked a used account',
-      'A hidden gesture is not a feature',
+      'Settings that stored a value and changed nothing',
+      'Starter playlists and a radio station that did not exist',
+      'A working feature nobody could find, because it was a hidden gesture',
     ],
+    aside: {
+      label: 'The rule we settled on',
+      items: ['A control that lies is worse than no control', 'An empty account should look empty'],
+    },
   },
   {
     kind: 'title',
-    title: 'Thank you',
-    subtitle: 'Questions?',
+    title: 'Luna Music',
+    subtitle: 'Source, write-up and this deck',
     note: 'github.com/NottRezz/Luna-Music',
   },
 ];
