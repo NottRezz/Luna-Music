@@ -125,6 +125,7 @@ export default function LibraryScreen() {
                 playing={playing}
                 onPress={() => play(matches, i, { kind: 'Playing from library', name: 'Your library' })}
                 onLongPress={() => promptAddToPlaylist(t)}
+                onAdd={() => promptAddToPlaylist(t)}
               />
             ))}
 

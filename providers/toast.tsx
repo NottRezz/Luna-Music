@@ -1,5 +1,5 @@
 /**
- * The app's one way of telling you something went wrong.
+ * The app's one way of telling you what just happened.
  *
  * Before this, 24 failure paths ended in `console.warn` and nothing else. A
  * track that could not be found played silence with a live-looking transport
@@ -7,11 +7,16 @@
  * device with no connection showed empty lists and no explanation, which reads
  * as data loss rather than a network problem.
  *
- * Deliberately not a full notification system. It is one line of text at the
- * top of the screen, it dismisses itself, and it is only used for things the
- * user *did* — a tap that did not do what it looked like it did. Background
+ * Deliberately not a full notification system. It is one line of text above the
+ * dock, it dismisses itself, and it is only used for things the user *did* — a
+ * tap that did not do what it looked like it did, or one whose result is
+ * off-screen (adding to a playlist you are not currently looking at). Background
  * failures that will retry (recording a play, say) stay in the log, because a
  * toast the user cannot act on is just noise.
+ *
+ * `tone` defaults to 'error' because that is what all 24 original call sites
+ * are. Confirmations must pass 'info' explicitly — flipping the default would
+ * quietly restyle every one of them.
  *
  * Mounted OUTSIDE every other provider. The provider order is Auth → Library →
  * Player → UI, so anything nested cannot be read by what wraps it, and the

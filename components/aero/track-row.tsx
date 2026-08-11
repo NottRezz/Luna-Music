@@ -10,7 +10,56 @@ import { Text, View } from 'react-native';
 import { C, F, G, R, SH, s, textShadow } from '@/constants/aero';
 import { artOf, mmss, type Track } from '@/types/music';
 import { Art } from './art';
+import { Icon } from './icon';
 import { Eq, Grad, Press, rowText } from './primitives';
+
+/**
+ * The row's trailing action — "+" to add to a playlist, a bin to remove.
+ *
+ * Both used to be long-press only. The gesture worked, but nothing on screen
+ * said it existed, so the feature was effectively missing: the first thing
+ * anyone said about the app was that there was no way to add a song to a
+ * playlist. A hidden gesture is not a feature. Long-press still works as a
+ * shortcut; this is the discoverable path.
+ *
+ * `hitSlop` matters more than the drawn size here. The button is deliberately
+ * small so it does not compete with the artwork, which would otherwise leave a
+ * target well under the 44px everyone recommends.
+ */
+function RowAction({
+  icon,
+  label,
+  onPress,
+  onLight,
+  tint,
+}: {
+  icon: 'plus' | 'trash';
+  label: string;
+  onPress: () => void;
+  /** Sitting on the orange playing row, where blue-on-orange would vibrate. */
+  onLight?: boolean;
+  tint?: string;
+}) {
+  const color = onLight ? '#fff' : (tint ?? C.lunaBlue);
+  return (
+    <Press onPress={onPress} scale={0.88} style={{ marginLeft: s(2) }}>
+      <View
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        hitSlop={s(10)}
+        style={{
+          width: s(26),
+          height: s(26),
+          borderRadius: s(13),
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: onLight ? 'rgba(255,255,255,.28)' : 'rgba(36,94,219,.09)',
+        }}>
+        <Icon name={icon} size={s(15)} color={color} />
+      </View>
+    </Press>
+  );
+}
 
 export function TrackRow({
   track,
@@ -19,6 +68,8 @@ export function TrackRow({
   playing = false,
   onPress,
   onLongPress,
+  onAdd,
+  onRemove,
 }: {
   track: Track;
   index: number;
@@ -26,6 +77,10 @@ export function TrackRow({
   playing?: boolean;
   onPress?: () => void;
   onLongPress?: () => void;
+  /** Shows the visible "+" affordance. */
+  onAdd?: () => void;
+  /** Shows a bin instead of the "+", for rows already in a playlist. */
+  onRemove?: () => void;
 }) {
   const body = (
     <>
@@ -57,6 +112,18 @@ export function TrackRow({
       <Text style={[rowText.dur, current && { color: 'rgba(255,255,255,.9)' }]}>
         {mmss(track.duration)}
       </Text>
+
+      {onRemove ? (
+        <RowAction
+          icon="trash"
+          label={`Remove ${track.title} from this playlist`}
+          onPress={onRemove}
+          onLight={current}
+          tint={C.ink3}
+        />
+      ) : onAdd ? (
+        <RowAction icon="plus" label={`Add ${track.title} to a playlist`} onPress={onAdd} onLight={current} />
+      ) : null}
     </>
   );
 
@@ -95,12 +162,14 @@ export function QueueRow({
   note,
   onPress,
   onLongPress,
+  onAdd,
 }: {
   track: Track;
   /** Replaces the artist line, e.g. "Vista Kids · 2 days ago". */
   note?: string;
   onPress?: () => void;
   onLongPress?: () => void;
+  onAdd?: () => void;
 }) {
   return (
     <Press onPress={onPress} onLongPress={onLongPress} scale={0.985}>
@@ -124,6 +193,9 @@ export function QueueRow({
           </Text>
         </View>
         <Text style={rowText.dur}>{mmss(track.duration)}</Text>
+        {onAdd ? (
+          <RowAction icon="plus" label={`Add ${track.title} to a playlist`} onPress={onAdd} />
+        ) : null}
       </View>
     </Press>
   );
