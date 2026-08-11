@@ -21,6 +21,8 @@ import { Dock } from '@/components/player/dock';
 import { NowPlaying } from '@/components/player/now-playing';
 import { PlaylistManager } from '@/components/playlist-manager';
 import { G } from '@/constants/aero';
+// TEMP (LM-3) — remove with lib/session-store.selftest.ts once verified.
+import { runSessionStoreSelfTest } from '@/lib/session-store.selftest';
 import { AuthProvider, useAuth } from '@/providers/auth';
 import { LibraryProvider } from '@/providers/library';
 import { PlayerProvider } from '@/providers/player';
@@ -47,6 +49,11 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) SplashScreen.hideAsync().catch(() => {});
   }, [loaded]);
+
+  // TEMP (LM-3) — runs before the auth gate, so it needs no session.
+  useEffect(() => {
+    void runSessionStoreSelfTest();
+  }, []);
 
   if (!loaded) return null;
 

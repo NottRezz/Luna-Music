@@ -21,6 +21,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Grad, IconBtn } from '@/components/aero/primitives';
+import { BrandMark } from '@/components/brand-mark';
 import { C, F, G, H, R, SH, s, textShadow } from '@/constants/aero';
 
 const TAB_LABELS: Record<string, string> = {
@@ -53,18 +54,7 @@ export function AeroChrome({ state, navigation }: BottomTabBarProps) {
         <Fizz />
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8), flex: 1 }}>
-          <Grad
-            g={G.brandOrb}
-            style={{
-              width: s(24),
-              height: s(24),
-              borderRadius: s(8),
-              alignItems: 'center',
-              justifyContent: 'center',
-              ...SH.btn,
-            }}>
-            <Text style={{ color: '#fff', fontSize: s(13), lineHeight: s(16) }}>♪</Text>
-          </Grad>
+          <BrandMark size={s(26)} style={SH.btn} />
 
           <View style={{ minWidth: 0 }}>
             <Text style={{ fontFamily: F.black, fontSize: s(13.5), color: '#fff', ...textShadow(0.45, 2) }}>
@@ -143,19 +133,40 @@ export function AeroChrome({ state, navigation }: BottomTabBarProps) {
   );
 }
 
-/** `.appbar .fizz` — bubbles rising through the header glass. */
-function Fizz() {
-  const bubbles = [
-    { size: 14, left: '12%', duration: 11000, delay: 0 },
-    { size: 8, left: '34%', duration: 8000, delay: 3000 },
-    { size: 18, left: '62%', duration: 13000, delay: 6000 },
-    { size: 6, left: '82%', duration: 7000, delay: 1000 },
-  ] as const;
+export type BubbleSpec = {
+  size: number;
+  /** Horizontal position as a percentage string, e.g. `'34%'`. */
+  left: string;
+  duration: number;
+  delay: number;
+};
 
+/** `.appbar .fizz` — tuned for the 46px bar. */
+const APPBAR_BUBBLES: readonly BubbleSpec[] = [
+  { size: 14, left: '12%', duration: 11000, delay: 0 },
+  { size: 8, left: '34%', duration: 8000, delay: 3000 },
+  { size: 18, left: '62%', duration: 13000, delay: 6000 },
+  { size: 6, left: '82%', duration: 7000, delay: 1000 },
+];
+
+/**
+ * Bubbles rising through the blue glass. Exported because the auth screens run
+ * the same ambience over a full screen — the defaults keep the app bar exactly
+ * as it was.
+ *
+ * @param rise how far a bubble travels, in mockup pixels, before it resets.
+ */
+export function Fizz({
+  bubbles = APPBAR_BUBBLES,
+  rise = 64,
+}: {
+  bubbles?: readonly BubbleSpec[];
+  rise?: number;
+}) {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
       {bubbles.map((b, i) => (
-        <Bubble key={i} {...b} />
+        <Bubble key={i} {...b} rise={rise} />
       ))}
     </View>
   );
@@ -166,16 +177,12 @@ function Bubble({
   left,
   duration,
   delay,
-}: {
-  size: number;
-  left: string;
-  duration: number;
-  delay: number;
-}) {
+  rise: riseUnits,
+}: BubbleSpec & { rise: number }) {
   const p = useSharedValue(0);
   // Resolved on the JS side: `s` is a module function and cannot be called
   // from inside a worklet.
-  const rise = s(64);
+  const rise = s(riseUnits);
 
   useEffect(() => {
     p.value = withDelay(

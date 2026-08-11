@@ -13,8 +13,12 @@ export function MoodsGrid({ onMoodSelect }: MoodsGridProps) {
   function handlePress(mood: Mood) {
     const query = getMoodSearchQuery(mood);
     onMoodSelect?.(mood, query);
+    // Search lives at the tab group's index route. There is no `explore` route
+    // and never has been — pointing at one broke `tsc` the moment Expo Router
+    // generated .expo/types (LM-1). The Search screen does not read `q` yet, so
+    // callers should use `onMoodSelect` for the query until it does.
     router.push({
-      pathname: "/(tabs)/explore",
+      pathname: "/(tabs)",
       params: { q: query, mood: mood.label },
     });
   }

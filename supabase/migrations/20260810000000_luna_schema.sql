@@ -130,12 +130,15 @@ declare
   candidate text;
   n integer := 0;
 begin
-  base_username := lower(regexp_replace(
-    split_part(coalesce(new.email, 'user'), '@', 1),
+  -- lower() FIRST. regexp_replace is case-sensitive, so stripping against
+  -- '[^a-z0-9_]' before folding deletes every capital letter instead of
+  -- lowercasing it, and 'Alex.Rivera@…' silently becomes 'lexivera'.
+  base_username := regexp_replace(
+    lower(split_part(coalesce(new.email, 'user'), '@', 1)),
     '[^a-z0-9_]',
     '',
     'g'
-  ));
+  );
   if base_username is null or length(base_username) < 3 then
     base_username := 'user';
   end if;

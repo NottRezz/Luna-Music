@@ -245,6 +245,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const i = shuffle
         ? Math.floor(Math.random() * queue.length)
         : (index + delta + queue.length) % queue.length;
+      // TEMP (LM-2) — one line per track end means fixed; two means the
+      // didJustFinish effect is still re-firing. Remove after verifying.
+      console.log('[LM-2] advance', delta, ':', index, '->', i, queue[i]?.title);
       setIndex(i);
       const nextTrack = queue[i];
       void load(nextTrack);
@@ -284,15 +287,43 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (queue.length > 1) void resolvePreview(queue[(index + 1) % queue.length]);
   }, [queue, index]);
 
-  // Advance at the end of a preview. `repeat` restarts the same track instead.
+  /**
+   * Latest transport state, for the end-of-track effect below to read without
+   * subscribing to. See the comment there for why it cannot depend on these.
+   */
+  const stepRef = useRef(step);
+  const repeatRef = useRef(repeat);
   useEffect(() => {
-    if (!status.didJustFinish) return;
-    if (repeat) {
+    stepRef.current = step;
+    repeatRef.current = repeat;
+  });
+
+  /** Whether the current `didJustFinish` has already been acted on. */
+  const handledFinish = useRef(false);
+
+  // Advance at the end of a preview. `repeat` restarts the same track instead.
+  //
+  // `didJustFinish` is a level, not an edge: it stays true on the status object
+  // until the next status arrives. So this must react to the *transition* only.
+  // Depending on `step` — which is recreated whenever `index` changes, i.e.
+  // immediately after this effect advances — re-ran the effect while the flag
+  // was still true and skipped a second track. `repeat` had the same problem
+  // whenever it was toggled mid-track. Both are read through refs instead, and
+  // the latch covers the case where the flag never falls between two finishes.
+  useEffect(() => {
+    if (!status.didJustFinish) {
+      handledFinish.current = false;
+      return;
+    }
+    if (handledFinish.current) return;
+    handledFinish.current = true;
+
+    if (repeatRef.current) {
       player.seekTo(0).then(() => player.play()).catch(() => {});
     } else {
-      step(1);
+      stepRef.current(1);
     }
-  }, [status.didJustFinish, repeat, player, step]);
+  }, [status.didJustFinish, player]);
 
   const value = useMemo<PlayerValue>(
     () => ({
