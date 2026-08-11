@@ -1,0 +1,20 @@
+{
+  "name": "luna-music-demo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Product demo site for the Luna Music app, published to GitHub Pages.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.5",
+    "vite": "^8.2.1"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  }
+}

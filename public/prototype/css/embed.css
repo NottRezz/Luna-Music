@@ -1,0 +1,52 @@
+/*
+ * Overrides for running the prototype inside an iframe on the demo site.
+ *
+ * styles.css is vendored byte-for-byte from the app repo's design/mockup so it
+ * stays diffable against the source of truth. Everything the embed needs to
+ * change lives here instead of being edited into that file.
+ */
+
+/* The mockup paints a full Frutiger Aero sky on <body>. Inside the frame the
+   surrounding page already provides a ground, and a second sky fighting it is
+   what made the phone look pasted on. */
+body.is-embed {
+  background: none;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The bokeh is fixed-position atmosphere for a full page. In a phone-sized
+   frame it just smears. */
+body.is-embed .bokeh {
+  display: none;
+}
+
+body.is-embed[data-mode='prototype'] #panel-prototype {
+  min-height: 100dvh;
+  padding: 0;
+}
+
+/* The device fills the frame: the site sizes the iframe, so letting the shell
+   round its own corners here would double up with the site's own frame. */
+body.is-embed .device {
+  height: 100dvh;
+  width: 100%;
+  border-radius: 0;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  /* The rise-in belongs to a page load, not to a frame that may already be
+     off-screen when it loads. */
+  animation: none;
+}
+
+body.is-embed .app {
+  border-radius: 0;
+}
+
+/* The prototype is a design study, not a real client — nothing inside it should
+   be reachable by keyboard from the host page's tab order until the reader has
+   actually moved into the frame. */
+body.is-embed {
+  margin: 0;
+}

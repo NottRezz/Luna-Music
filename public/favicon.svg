@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Luna Music">
+  <defs>
+    <linearGradient id="orb" x1="0" y1="0" x2="0.72" y2="1">
+      <stop offset="0" stop-color="#8fd4ff"/>
+      <stop offset="0.58" stop-color="#2f6fe4"/>
+      <stop offset="1" stop-color="#17337d"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#orb)"/>
+  <path d="M0 15A15 15 0 0 1 15 0h34a15 15 0 0 1 15 15v14c-12 7-22 9-32 9S12 35 0 30z" fill="url(#gloss)"/>
+  <path d="M40 12v22.5a8.5 8.5 0 1 1-4-7.2V19l-14 3.4v18.1a8.5 8.5 0 1 1-4-7.2V17.6z" fill="#fff"/>
+</svg>
