@@ -243,7 +243,6 @@
   });
   toggleAria($("#npRepeat"), (on) => { state.repeat = on; });
   toggleAria($("#npLike"), (on) => { state.liked = on; });
-  toggleAria($("#plLike"));
 
   $("#playAll").addEventListener("click", () => goto(0, true));
 
@@ -467,15 +466,6 @@
     });
   });
 
-  // Radio listener count drifts, so the "live" badge isn't a lie.
-  (function () {
-    const el = $("#listeners");
-    let n = 2418;
-    setInterval(() => {
-      n += Math.floor(Math.random() * 21) - 9;
-      el.textContent = n.toLocaleString() + " listening now";
-    }, 4000);
-  })();
 
   /* ---------------- Boot ---------------- */
   renderTrack();

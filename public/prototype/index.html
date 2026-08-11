@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/embed.css" />
 </head>
@@ -81,7 +82,7 @@
             <button type="button" class="pl-card">
               <div class="art art--c"><b>31 TRACKS</b></div>
               <div class="name">Glass Garden</div>
-              <div class="sub">2h 04m · Ambient</div>
+              <div class="sub">2h 04m</div>
             </button>
             <button type="button" class="pl-card">
               <div class="art art--b"><b>12 TRACKS</b></div>
@@ -90,19 +91,7 @@
             </button>
           </div>
 
-
-          <div class="ticker">
-            <span class="dot" aria-hidden="true"></span>
-            <div>
-              <p>Luna Radio · Aero Channel</p>
-              <small id="listeners">2,418 listening now</small>
-            </div>
-            <button type="button" class="btn btn-green" style="margin-left:auto">
-              <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Tune in
-            </button>
-          </div>
-
-          <div class="section-label">Jump back in <span>History</span></div>
+          <div class="section-label">Jump back in</div>
           <div class="queue">
             <button type="button" class="q-item">
               <span class="art art--e"></span>
@@ -129,7 +118,7 @@
             <div class="meta">
               <div class="kicker">Playlist</div>
               <h2>Midnight Echoes</h2>
-              <div class="sub">Luna Collective · 24 tracks</div>
+              <div class="sub">24 tracks · 1h 42m</div>
             </div>
           </div>
 
@@ -140,9 +129,6 @@
             <button type="button" class="icon-sq" id="plShuffle" aria-pressed="false" aria-label="Shuffle">
               <svg viewBox="0 0 24 24"><path d="M10.6 9.2 5.4 4 4 5.4l5.2 5.2 1.4-1.4zM14.5 4l2 2L4 18.6 5.4 20 18 7.5l2 2V4h-5.5zm.3 9.4-1.4 1.4 3.1 3.1L14.5 20H20v-5.5l-2 2-3.2-3.1z"/></svg>
             </button>
-            <button type="button" class="icon-sq" id="plLike" aria-pressed="true" aria-label="Save playlist">
-              <svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.7-9.6-9A5.4 5.4 0 0 1 12 6.3a5.4 5.4 0 0 1 9.6 5.7C19.5 16.3 12 21 12 21z"/></svg>
-            </button>
             <button type="button" class="icon-sq" aria-label="More options">
               <svg viewBox="0 0 24 24"><path d="M12 8a2 2 0 1 0-2-2 2 2 0 0 0 2 2zm0 2a2 2 0 1 0 2 2 2 2 0 0 0-2-2zm0 6a2 2 0 1 0 2 2 2 2 0 0 0-2-2z"/></svg>
             </button>
@@ -151,10 +137,9 @@
           <div class="stat-strip">
             <div class="stat blue"><div class="k">TRACKS</div><div class="v">24</div></div>
             <div class="stat orange"><div class="k">PLAYTIME</div><div class="v">1h 42m</div></div>
-            <div class="stat green"><div class="k">SAVED</div><div class="v">312</div></div>
           </div>
 
-          <div class="section-label">Tracks <span>Sort: Custom</span></div>
+          <div class="section-label">Tracks</div>
           <div class="tracks" id="trackList"></div>
         </section>
 
@@ -203,11 +188,19 @@
           <div class="profile-stats">
             <div><b>1,284</b><span>Songs</span></div>
             <div><b>37</b><span>Playlists</span></div>
-            <div><b>92h</b><span>This year</span></div>
+            <div><b>48</b><span>Recent</span></div>
           </div>
 
           <div class="section-label">Account</div>
           <div class="form">
+            <div class="form-row">
+              <label for="pfName">Display name</label>
+              <div class="field">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#7e9fc4"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-3.9 0-9 1.9-9 4.5V21h18v-2.5c0-2.6-5.1-4.5-9-4.5z"/></svg>
+                <input id="pfName" type="text" value="Alex Rivera" autocomplete="name" />
+              </div>
+            </div>
+
             <div class="form-row">
               <label for="pfUser">Username</label>
               <div class="field">
@@ -234,11 +227,18 @@
                 </button>
               </div>
             </div>
+
+            <div class="form-row">
+              <label for="pfNew">New password</label>
+              <div class="field">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#7e9fc4"><path d="M17 9V7a5 5 0 0 0-10 0v2H5v12h14V9zm-8-2a3 3 0 0 1 6 0v2H9zm3 6a2 2 0 0 1 1 3.7V19h-2v-2.3A2 2 0 0 1 12 13z"/></svg>
+                <input id="pfNew" type="password" value="" placeholder="At least 6 characters" autocomplete="new-password" />
+              </div>
+            </div>
           </div>
 
-
           <div class="profile-actions">
-            <button type="button" class="btn btn-blue">Save changes</button>
+            <button type="button" class="btn btn-blue">Update password</button>
             <button type="button" class="btn btn-quiet">Sign out</button>
           </div>
         </section>

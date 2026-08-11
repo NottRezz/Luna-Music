@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 
 import Device from './Device.jsx';
+import Present from './Present.jsx';
 import Spec from './Spec.jsx';
-import { DECISIONS, HARDENING, REPO, SCREENS, STACK } from './content.js';
+import { HARDENING, INTERFACE, REPO, SCREENS, STACK, TECH } from './content.js';
 
 /** Vite rewrites this to /Luna-Music/prototype/ at build time. */
 const PROTOTYPE = `${import.meta.env.BASE_URL}prototype/index.html`;
@@ -22,8 +23,13 @@ function useTheme() {
 
 export default function App() {
   const [screen, setScreen] = useState('search');
+  const [presenting, setPresenting] = useState(false);
   const [theme, setTheme] = useTheme();
   const active = SCREENS.find((s) => s.id === screen) ?? SCREENS[0];
+
+  if (presenting) {
+    return <Present onExit={() => setPresenting(false)} prototypeSrc={PROTOTYPE} />;
+  }
 
   return (
     <>
@@ -37,10 +43,13 @@ export default function App() {
           </span>
           <nav className="masthead__nav">
             <a href="#screens">Screens</a>
-            <a href="#design">Design</a>
+            <a href="#decisions">Decisions</a>
             <a href="#build">Build</a>
             <a href="#security">Security</a>
           </nav>
+          <button type="button" className="present-btn" onClick={() => setPresenting(true)}>
+            Present
+          </button>
           <button
             type="button"
             className="theme-btn"
@@ -133,25 +142,53 @@ export default function App() {
           </div>
         </section>
 
-        {/* ---------------- Design ---------------- */}
-        <section id="design">
+        {/* ---------------- Technical decisions ---------------- */}
+        <section id="decisions">
           <div className="wrap">
-            <p className="eyebrow">Why it looks like this</p>
-            <h2 className="h2">Six decisions worth defending</h2>
+            <p className="eyebrow">Technical decisions</p>
+            <h2 className="h2">What we chose, and what it cost</h2>
             <p className="lede">
-              Frutiger Aero is glass, gloss, saturated depth and optimism — a 2007 look
-              rebuilt on a 2026 stack. Most of the interesting choices were not about
-              taste; they were about what the look does once it meets a real device.
+              Every one of these had a credible alternative. What follows is why the
+              alternative lost, and what we gave up by not taking it — a list of
+              trade-offs with no costs in it would be marketing rather than engineering.
             </p>
 
-            <div className="cards">
-              {DECISIONS.map((d) => (
-                <article className="card" key={d.id}>
-                  <Spec spec={d.spec} />
-                  <h3>{d.title}</h3>
+            <div className="cards cards--tech">
+              {TECH.map((d) => (
+                <article className="card card--tech" key={d.id}>
+                  <p className="card__tag">{d.tag}</p>
+                  <h3>
+                    {d.title} <span className="card__instead">{d.instead}</span>
+                  </h3>
                   {d.body.map((para) => (
                     <p key={para}>{para}</p>
                   ))}
+                  <p className="card__tradeoff">
+                    <b>Trade-off</b>
+                    {d.tradeoff}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ---------------- Interface decisions ---------------- */}
+        <section id="interface">
+          <div className="wrap">
+            <p className="eyebrow">Interface decisions</p>
+            <h2 className="h2">Three places the design had consequences</h2>
+            <p className="lede">
+              The visual language came from a mockup. These are the three points where a
+              choice about it turned out to be measurable rather than a matter of taste.
+            </p>
+
+            <div className="cards">
+              {INTERFACE.map((d) => (
+                <article className="card" key={d.title}>
+                  <Spec spec={d.spec} />
+                  <h3>{d.title}</h3>
+                  <p>{d.body}</p>
                 </article>
               ))}
             </div>

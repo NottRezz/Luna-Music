@@ -41,11 +41,43 @@ the site at `http://localhost:4173/Luna-Music/`, not at the root.
 selected once; with the default "Deploy from a branch" the workflow runs and the
 deploy step fails.
 
+## Presentation mode
+
+The **Present** button in the header turns the page into a slide deck for
+demoing the project live. Arrows or space to move, `F` for fullscreen, `Esc` to
+leave; clicking the right or left of the screen also works.
+
+It is deliberately a different medium from the page: eleven slides, a headline
+and at most three short lines each, sized to be read across a room while
+somebody talks over it. Two of the slides embed the live prototype, so the demo
+needs no phone, no emulator and no network to the app.
+
+Slide content lives in `SLIDES` in `src/content.js`.
+
 ## Keeping the prototype honest
 
-`public/prototype/` is a copy, so it can drift from the app. It has already been
-corrected once, to match features removed from the shipped app: the Moods grid,
-the "Ask Luna AI" button, Browse genres, the seeded "Made for you" playlists and
-the entire Playback settings block. If you remove or add a feature in the app,
-change it here too — a demo that shows controls the app no longer has is worse
-than no demo.
+`public/prototype/` is a copy of the app repo's `design/mockup/`, so it drifts
+as the app changes. `scripts/sync-prototype.py` re-derives it from the pristine
+source rather than hand-patching the copy, which keeps the edits a reviewable
+list and makes them re-runnable after the mockup changes:
+
+```bash
+python scripts/sync-prototype.py ../Luna-Music/design/mockup/index.html public/prototype/index.html
+```
+
+It removes what the app removed — the Moods grid, the "Ask Luna AI" button,
+Browse genres, the Luna Radio ticker, the seeded "Made for you" playlists, the
+playlist heart, the "saved" stat and the whole Playback settings block — and
+rewrites the profile form to the app's real change-password flow. It asserts on
+the result and refuses to write a file with unbalanced markup.
+
+Two things it does not cover, which live alongside it:
+
+- `js/embed.js` injects the visible **+** and bin row actions and the
+  confirmation toast, so `app.js` stays close to its vendored original.
+- `js/app.js` is patched only where it bound listeners to removed controls.
+  Leaving those bindings in threw on load, which stopped `window.Luna` from
+  being defined and silently broke the screen picker.
+
+If you add or remove a feature in the app, change it here too. A demo showing
+controls the app no longer has is worse than no demo.

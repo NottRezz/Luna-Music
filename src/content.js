@@ -15,9 +15,9 @@ export const SCREENS = [
     blurb:
       'Luna has no catalogue of its own. Everything starts as a query against the iTunes Search API, which returns metadata and a thirty-second preview for each result.',
     points: [
-      'Recent searches persist as chips on the device only. They are the one piece of state that never reaches the server, because a list of what you searched for is not worth the privacy cost of syncing it.',
+      'Recent searches persist on the device only. They are the one piece of state that never reaches the server, because a list of what you searched for is not worth the privacy cost of syncing it.',
       'A failed search shows an error and leaves the previous results alone. It used to render an empty list, which said "nothing matched" when the truth was "the request did not complete".',
-      'Every row carries a + that opens the playlist sheet. That used to be a long-press with nothing on screen to suggest it, which meant the feature may as well not have existed.',
+      'Every row carries a + that adds it to a playlist. That used to be a long-press with nothing on screen to suggest it, which meant the feature may as well not have existed.',
     ],
   },
   {
@@ -51,7 +51,7 @@ export const SCREENS = [
       'Cover, waveform, transport, queue. This is where the Frutiger Aero language is densest: glass, gloss, saturated depth and a single warm accent.',
     points: [
       'The playing row is the only warm colour anywhere in the interface. Because nothing else competes for it, orange alone is enough to say "this one".',
-      'Playback runs through expo-audio with the queue held in a provider above the router, so the dock keeps playing while you move between tabs.',
+      'The queue lives in a provider mounted above the router, so playback survives moving between tabs and the dock keeps working everywhere.',
       'Previews are thirty seconds. The transport shows real elapsed and remaining time rather than a fabricated full-track duration.',
     ],
   },
@@ -69,64 +69,129 @@ export const SCREENS = [
   },
 ];
 
-export const DECISIONS = [
+/**
+ * The technical decisions. Each names what was chosen *instead*, because a
+ * decision with no alternative is not a decision, and each ends on what it
+ * cost — a trade-off list with no costs in it is marketing.
+ */
+export const TECH = [
   {
-    id: 'mockup',
-    title: 'The mockup is the source of truth',
-    spec: { kind: 'gradient', css: 'linear-gradient(180deg,#5d9ef5 0%,#245edb 46%,#1941a5 100%)', label: 'App bar', onDark: true },
+    id: 'itunes',
+    tag: 'Catalogue',
+    title: 'Why the iTunes Search API',
+    instead: 'instead of Spotify or YouTube',
     body: [
-      'The design was authored as a working HTML and CSS prototype before any React Native was written, and that prototype is vendored into the app repository. The phone at the top of this page is that exact file.',
-      'The rule the codebase follows is written into the token file: when a value in the app disagrees with the mockup, the mockup wins. It means the design can be checked rather than argued about.',
+      'It needs no API key and no OAuth flow. That matters more than convenience here: Luna is a client-side app, so any credential it holds ships to the device and can be extracted. An endpoint that requires no secret is one that cannot leak one.',
+      'Spotify was the obvious alternative and was rejected on playback. Its Web API returns metadata freely, but actually playing a track requires the Spotify SDK and a Premium account — every marker and every teammate would have needed to buy one. Its audio previews were also being withdrawn during development.',
+      'iTunes returns a plain HTTPS MP3 preview URL per track, which any audio library can play directly with no SDK in between.',
     ],
+    tradeoff:
+      'Thirty-second previews only, no full tracks and no lyrics. The catalogue is Apple’s, so anything missing there is missing in Luna.',
   },
   {
-    id: 'scale',
-    title: 'Everything is scaled, nothing is fixed',
-    spec: { kind: 'text', text: 's(14) → 14 × w/372', tone: 'ink' },
+    id: 'supabase',
+    tag: 'Backend',
+    title: 'Why Supabase',
+    instead: 'instead of Firebase or our own server',
     body: [
-      'The mockup was drawn against a 372-pixel-wide phone. Real devices are wider, so shipping those numbers unchanged renders a design that is correct in proportion but slightly too small everywhere.',
-      'Every dimension in the app goes through one helper that multiplies by the device width over 372. The designer’s proportions survive; only the absolute size changes.',
+      'The data is relational. A playlist has many tracks, a track appears in many playlists, and the same track is referenced by favourites and history. That is a join table and foreign keys — Postgres describes it in one schema, whereas Firestore would have meant duplicating track documents per user and keeping them in sync by hand.',
+      'Supabase also bundles the auth server, and the JWT it issues is readable inside the database as auth.uid(). That is what makes the security model below possible without writing an API layer.',
+      'A custom Express and Postgres server was the third option. It would have meant hosting, deployment and a second codebase to maintain for a four-person course project, in exchange for capabilities we did not need.',
     ],
+    tradeoff:
+      'The authorisation rules are Postgres-specific SQL. Moving off Supabase means rewriting every policy, not just swapping a client library.',
   },
   {
-    id: 'contrast',
-    title: 'The auth screens needed their own gradient',
+    id: 'rls',
+    tag: 'Security',
+    title: 'Why the rules live in the database',
+    instead: 'instead of checks in the app',
+    body: [
+      'The Supabase anon key ships inside the app bundle, and anything shipped to a device can be read off it. With that key, anyone can call the REST API directly and skip the app entirely.',
+      'So a check written in React is advisory. "Only fetch the playlists where user_id equals me" is a filter, not a permission — the server would happily return everyone’s if asked differently.',
+      'Row-level security moves that sentence into the table itself, where it runs on every query no matter who is asking or what client they used. The app cannot forget it and an attacker cannot skip it.',
+    ],
+    tradeoff:
+      'Policies are easy to get subtly wrong and the failure is silent — a too-permissive policy looks identical to a correct one until someone tests it. That is what the audit was for.',
+  },
+  {
+    id: 'expo',
+    tag: 'Client',
+    title: 'Why Expo and React Native',
+    instead: 'instead of native Swift and Kotlin',
+    body: [
+      'One codebase covers iOS and Android, which for a team of four is the difference between building the app twice and building it once.',
+      'Expo Go matters for a project that has to be handed in and demonstrated: anyone can run it by scanning a QR code, with no Xcode, no Android Studio and no signing certificates.',
+      'The pieces Luna needs are first-party Expo modules — secure storage, audio, gradients, routing — so there is no bridging code to write or maintain.',
+    ],
+    tradeoff:
+      'You are limited to what the managed workflow supports. Anything needing a custom native module means leaving Expo Go behind for a development build.',
+  },
+  {
+    id: 'audio',
+    tag: 'Playback',
+    title: 'Why expo-audio',
+    instead: 'instead of expo-av',
+    body: [
+      'expo-av was the long-standing choice and is now deprecated; expo-audio is its replacement, so starting on expo-av would have meant a migration before the project was even finished.',
+      'Its API is hooks rather than imperative objects, so playback state arrives the same way every other value in a React component does, instead of being mirrored into state by hand.',
+    ],
+    tradeoff:
+      'It is young, and some behaviour is undocumented. Its "track finished" flag reports a state rather than an event, so it stays true after firing and auto-advance needs a guard to avoid skipping twice.',
+  },
+  {
+    id: 'securestore',
+    tag: 'Session',
+    title: 'Why expo-secure-store holds the session',
+    instead: 'instead of AsyncStorage',
+    body: [
+      'Staying signed in means storing a refresh token, and a refresh token is a long-lived key to the account.',
+      'AsyncStorage keeps it in plain text on disk, where any process with file access on a rooted or jailbroken device can read it. SecureStore hands it to the Android Keystore or the iOS Keychain, which are hardware-backed.',
+    ],
+    tradeoff:
+      'SecureStore caps a single value at 2048 bytes and a Supabase session exceeds that, so the storage adapter splits the value across numbered keys and reassembles it on read.',
+  },
+  {
+    id: 'cache',
+    tag: 'Schema',
+    title: 'Why one shared tracks table',
+    instead: 'instead of a copy per user',
+    body: [
+      'Playlists, favourites and history all need to point at something stable. The iTunes track id is stable and globally unique, so it is used directly as the primary key and every other table references it.',
+      'One shared row per track also means a song saved by fifty accounts is stored once, not fifty times.',
+    ],
+    tradeoff:
+      'A shared row with a client-chosen key belongs to whoever writes it first, so one account’s bad data would be everyone’s. That is why the table is insert-only and why its URLs are constrained to Apple’s hosts by the database itself.',
+  },
+];
+
+/**
+ * Interface decisions, kept short. The technical section above is the argument;
+ * these are the three places where the visual design had a measurable
+ * consequence rather than an aesthetic one.
+ */
+export const INTERFACE = [
+  {
+    title: 'A gradient that failed contrast',
+    body:
+      'The login screen first reused the near-white content gradient. White display type on top of it measured about 1.05:1 — legible on the designer’s monitor, invisible in daylight. It now uses the app bar’s blue ramp stretched full-screen.',
     spec: {
       kind: 'split',
       left: { css: 'linear-gradient(160deg,#eaf3ff,#f7fbff)', label: 'Before · 1.05:1', onDark: false },
       right: { css: 'linear-gradient(168deg,#5d9ef5,#245edb 40%,#1941a5 78%,#102b6b)', label: 'After', onDark: true },
     },
-    body: [
-      'Login and register first reused the content-pane gradient, which is very nearly white. The white display type on top of it landed at about 1.05:1 — legible on the designer’s monitor, invisible in daylight.',
-      'They now use the app bar’s blue ramp stretched to a full screen, with a darker stop added at the bottom so it does not wash out over that distance.',
-    ],
   },
   {
-    id: 'weights',
-    title: 'Font weights are named, never numbered',
-    spec: { kind: 'weights' },
-    body: [
-      'Nunito ships as discrete weight files. Android ignores a numeric fontWeight on a custom family and silently falls back to regular, so a heading asking for 900 renders at 400 and nobody sees an error.',
-      'The token file exposes the five weights by name. There is no way to ask for a weight that does not exist.',
-    ],
-  },
-  {
-    id: 'overscroll',
-    title: 'Overscroll is turned off everywhere',
-    spec: { kind: 'text', text: 'overScrollMode: never', tone: 'mono' },
-    body: [
-      'The design has no overscroll affordance, and Android 12’s stretch effect actively fights the fling — it reads on device as the list snapping backwards mid-scroll.',
-      'One shared constant is spread onto every scroll view in the app, which is also how it stays consistent rather than being remembered per screen.',
-    ],
-  },
-  {
-    id: 'toast',
-    title: 'The error surface sits above the dock',
+    title: 'A gesture nobody could find',
+    body:
+      'Adding a song to a playlist worked, wrote to the database and persisted — but long-press was the only way in and nothing on screen said so. It was reported as a missing feature. Every row now carries a visible +, and every add confirms.',
     spec: { kind: 'toast' },
-    body: [
-      'Before this, twenty-four failure paths ended in a console warning and nothing else. A track with no audio played silence behind a live-looking transport; a like that failed looked saved until the next launch.',
-      'The first version placed the message under the tab strip, where on the Search screen it covered the search field — so "search failed, try again" sat directly on top of the control you would try again with. It moved to the bottom, where only the dock lives and the dock’s height is known.',
-    ],
+  },
+  {
+    title: 'Numbers nobody counted',
+    body:
+      'Seeded playlists, mood tiles, a radio channel with 2,418 listeners, a "saved" count for sharing that does not exist. All removed. A demo account now looks exactly as empty as it is.',
+    spec: { kind: 'text', text: '312 → 0', tone: 'ink' },
   },
 ];
 
@@ -183,5 +248,112 @@ export const HARDENING = [
     state: 'open',
     key: 'Credential rotation',
     body: 'An .env file reached the public repository early in its history. Deleting the file does not remove it from history, so the anon key still needs rotating — the honest status is outstanding, not closed.',
+  },
+];
+
+/**
+ * Presentation mode.
+ *
+ * A different medium with different rules: this is read from across a room
+ * while somebody talks over it, so each slide carries a headline and at most
+ * three short lines. Anything needing a paragraph belongs on the page, not
+ * here. The speaker supplies the detail; the slide supplies the anchor.
+ */
+export const SLIDES = [
+  {
+    kind: 'title',
+    title: 'Luna Music',
+    subtitle: 'A cross-platform music player built to a Frutiger Aero design',
+    note: 'CPRG 303-B · SPHR Studios',
+  },
+  {
+    kind: 'points',
+    eyebrow: 'The idea',
+    title: 'Search anything. Keep what you like.',
+    points: [
+      'Search a real music catalogue',
+      'Play it, save it, organise it into playlists',
+      'Your library follows your account, not your phone',
+    ],
+  },
+  {
+    kind: 'demo',
+    eyebrow: 'Live',
+    title: 'The app',
+    screen: 'search',
+    note: 'Running here in the browser — this is the real interface, not a video.',
+  },
+  {
+    kind: 'points',
+    eyebrow: 'Decision 1',
+    title: 'iTunes API, not Spotify',
+    points: [
+      'No API key — nothing secret ships to the device',
+      'Spotify playback needs Premium for every user',
+      'Cost: thirty-second previews only',
+    ],
+  },
+  {
+    kind: 'points',
+    eyebrow: 'Decision 2',
+    title: 'Supabase, not Firebase',
+    points: [
+      'The data is relational — playlists and tracks are many-to-many',
+      'Auth and database in one, no API layer to write',
+      'Cost: the rules are Postgres-specific',
+    ],
+  },
+  {
+    kind: 'points',
+    eyebrow: 'Decision 3',
+    title: 'Security lives in the database',
+    points: [
+      'The app’s key ships to the device, so it can be extracted',
+      'A rule in the app is a filter; a rule in the table is a permission',
+      'Every query is checked, whatever client sent it',
+    ],
+  },
+  {
+    kind: 'points',
+    eyebrow: 'Decision 4',
+    title: 'Expo, not native twice',
+    points: [
+      'One codebase for iOS and Android',
+      'Runs from a QR code — no Xcode, no signing',
+      'Cost: custom native code means leaving Expo Go',
+    ],
+  },
+  {
+    kind: 'demo',
+    eyebrow: 'Live',
+    title: 'Now playing',
+    screen: 'now',
+    note: 'Persistent playback, a real queue, and one warm accent in a cool interface.',
+  },
+  {
+    kind: 'points',
+    eyebrow: 'What we found',
+    title: 'We audited our own database',
+    points: [
+      'One shared table let any account rewrite any song for everyone',
+      'Every account could grant itself PREMIUM',
+      'Five issues found, five closed, one still open',
+    ],
+  },
+  {
+    kind: 'points',
+    eyebrow: 'What we learned',
+    title: 'A control that lies is worse than none',
+    points: [
+      'Removed settings that stored a value and did nothing',
+      'Removed seeded content that faked a used account',
+      'A hidden gesture is not a feature',
+    ],
+  },
+  {
+    kind: 'title',
+    title: 'Thank you',
+    subtitle: 'Questions?',
+    note: 'github.com/NottRezz/Luna-Music',
   },
 ];

@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
  * app.js has run, and until then requests are held — posting into a frame that
  * has not finished parsing is the usual reason a first click does nothing.
  */
-export default function Device({ screen, src, title, hint }) {
+export default function Device({ screen, src, title, hint, compact = false }) {
   const frame = useRef(null);
   const [ready, setReady] = useState(false);
 
@@ -35,7 +35,7 @@ export default function Device({ screen, src, title, hint }) {
   }, [ready, screen]);
 
   return (
-    <div className="device">
+    <div className={compact ? 'device device--compact' : 'device'}>
       <div className="device__shell">
         <iframe
           ref={frame}
