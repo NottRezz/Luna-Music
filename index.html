@@ -26,7 +26,52 @@
     />
   </head>
   <body>
-    <div id="root"></div>
+    <!--
+      The contents of #root are a fallback, not content. React clears the
+      container on its first render, so this is only ever visible when the
+      bundle did not load.
+
+      It exists because the failure it describes is completely silent
+      otherwise. If GitHub Pages is set to "Deploy from a branch" it serves this
+      file straight from the repository, where the script below still points at
+      the unbuilt /src/main.jsx — a path that does not exist on Pages and is JSX
+      the browser could not run anyway. React never mounts, #root stays empty,
+      and the site is a plain white page with nothing in the UI to say why.
+
+      Styles are inline on purpose: the stylesheet is part of the same bundle,
+      so anything that stops the script also stops the CSS.
+    -->
+    <div id="root">
+      <div
+        style="
+          font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+          color: #12243f;
+          background: #f2f6fa;
+          min-height: 100vh;
+          margin: 0;
+          padding: 12vh 6vw;
+          box-sizing: border-box;
+        ">
+        <h1 style="font-size: 26px; line-height: 1.2; margin: 0 0 14px">
+          The site did not load its build.
+        </h1>
+        <p style="margin: 0 0 12px; max-width: 62ch; color: #41597a">
+          You are seeing this file as it exists in the repository, rather than the
+          compiled site. Nothing is broken — GitHub Pages is publishing the branch
+          directly instead of the output of the build.
+        </p>
+        <p style="margin: 0 0 12px; max-width: 62ch; color: #41597a">
+          Fix it in <b>Settings → Pages → Build and deployment</b>: set
+          <b>Source</b> to <b>GitHub Actions</b>, then re-run the
+          <i>Deploy demo site to GitHub Pages</i> workflow from the Actions tab.
+        </p>
+        <p style="margin: 0; max-width: 62ch; color: #6f88a5; font-size: 14.5px">
+          With "Deploy from a branch", GitHub serves these files as-is and never runs
+          <code>npm run build</code>, so the JavaScript, the stylesheet and the
+          prototype under <code>public/</code> are all absent.
+        </p>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
