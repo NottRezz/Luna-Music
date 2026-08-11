@@ -279,10 +279,13 @@ export const SLIDES = [
     eyebrow: 'Live',
     title: 'The app',
     screen: 'search',
+    // Nothing here about the demo being a browser rather than a phone. That is
+    // a fact about our setup, not about the app, and volunteering it puts "so
+    // why aren't we seeing the real thing" into a room that was not asking.
     points: [
-      'Running in the browser — the real interface, not a video',
+      'Four screens: search, playlist, library, profile',
+      'Results come from Apple’s live catalogue, not a fixed list',
       'One player shared by every tab, so audio survives navigation',
-      'A new account starts empty; nothing here is pre-filled',
     ],
   },
   {
