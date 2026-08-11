@@ -18,6 +18,7 @@ import { AeroButton, Field, Grad, Press, SectionLabel } from '@/components/aero/
 import { Sheet, SheetGrabber } from '@/components/aero/sheet';
 import { C, DOWN, F, G, SCROLL, SH, s } from '@/constants/aero';
 import { useLibrary } from '@/providers/library';
+import { useToast } from '@/providers/toast';
 import { useUI } from '@/providers/ui';
 
 export function PlaylistManager() {
@@ -26,6 +27,7 @@ export function PlaylistManager() {
     setActivePlaylist, createPlaylist, renamePlaylist, deletePlaylist,
   } = useLibrary();
   const { managerOpen, closeManager } = useUI();
+  const { notify } = useToast();
 
   const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
@@ -41,14 +43,18 @@ export function PlaylistManager() {
         setName('');
         closeManager();
       })
-      .catch((err) => console.warn('createPlaylist failed:', err));
+      .catch((err) => {
+        console.warn('createPlaylist failed:', err);
+        notify('Could not create that playlist.');
+      });
   };
 
   const commitRename = () => {
     if (editing && draft.trim()) {
-      void renamePlaylist(editing, draft.trim()).catch((err) =>
-        console.warn('renamePlaylist failed:', err),
-      );
+      void renamePlaylist(editing, draft.trim()).catch((err) => {
+        console.warn('renamePlaylist failed:', err);
+        notify('Could not rename that playlist.');
+      });
     }
     setEditing(null);
   };
@@ -150,9 +156,10 @@ export function PlaylistManager() {
                         icon="trash"
                         tone="red"
                         onPress={() =>
-                          void deletePlaylist(p.id).catch((err) =>
-                            console.warn('deletePlaylist failed:', err),
-                          )
+                          void deletePlaylist(p.id).catch((err) => {
+                            console.warn('deletePlaylist failed:', err);
+                            notify('Could not delete that playlist.');
+                          })
                         }
                       />
                     </View>

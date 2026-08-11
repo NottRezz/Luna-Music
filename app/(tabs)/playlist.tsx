@@ -7,7 +7,6 @@
  * lives at the root (see components/playlist-manager.tsx).
  */
 
-import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { Art } from '@/components/aero/art';
@@ -18,17 +17,14 @@ import { Screen } from '@/components/screen';
 import { C, F, R, SH, s } from '@/constants/aero';
 import { useLibrary } from '@/providers/library';
 import { usePlayer } from '@/providers/player';
+import { useToast } from '@/providers/toast';
 import { useUI } from '@/providers/ui';
 
 export default function PlaylistScreen() {
   const { activePlaylist, tracksOf, statsOf, removeFromPlaylist } = useLibrary();
   const { play, track: current, playing, shuffle, setShuffle } = usePlayer();
   const { openManager } = useUI();
-
-  // Starts off. It used to start on, so every playlist opened already hearted
-  // — asserting a state the app does not store. The control is still inert;
-  // see the note on the actions row.
-  const [liked, setLiked] = useState(false);
+  const { notify } = useToast();
 
   // The account can now genuinely have no playlists — there are no seeded ones
   // underneath to fall back to — so this screen has to stand on its own.
@@ -91,7 +87,10 @@ export default function PlaylistScreen() {
           onPress={() => tracks.length > 0 && play(tracks, 0, source)}
         />
         <IconSq name="shuffle" active={shuffle} onPress={() => setShuffle(!shuffle)} />
-        <IconSq name="heart" active={liked} onPress={() => setLiked(!liked)} />
+        {/* The heart is gone. It was local state that defaulted to on, so every
+            playlist opened already hearted, and nothing stored it — there is no
+            "liked playlist" anywhere in the schema. Liking a *track* is real and
+            lives in Now Playing. */}
         <IconSq name="more" onPress={openManager} />
       </View>
 
@@ -125,9 +124,10 @@ export default function PlaylistScreen() {
               // means remove. It used to branch on `custom` because the seeded
               // ones could not be edited.
               onLongPress={() =>
-                void removeFromPlaylist(activePlaylist.id, t.id).catch((err) =>
-                  console.warn('removeFromPlaylist failed:', err),
-                )
+                void removeFromPlaylist(activePlaylist.id, t.id).catch((err) => {
+                  console.warn('removeFromPlaylist failed:', err);
+                  notify('Could not remove that song.');
+                })
               }
             />
           ))}

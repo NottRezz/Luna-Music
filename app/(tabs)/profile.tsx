@@ -9,15 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { Art } from '@/components/aero/art';
-import {
-  AeroButton,
-  AeroSwitch,
-  Card,
-  Field,
-  Press,
-  SectionLabel,
-  Segmented,
-} from '@/components/aero/primitives';
+import { AeroButton, Card, Field, Press, SectionLabel } from '@/components/aero/primitives';
 import { Icon } from '@/components/aero/icon';
 import { Screen } from '@/components/screen';
 import { C, F, R, SH, s, textShadow } from '@/constants/aero';
@@ -25,8 +17,6 @@ import type { ArtKey } from '@/constants/art';
 import { updateProfile } from '@/lib/db/profiles';
 import { useAuth } from '@/providers/auth';
 import { useLibrary } from '@/providers/library';
-
-const QUALITY = ['Normal', 'High', 'Lossless'] as const;
 
 function asArtKey(value: string | null | undefined): ArtKey {
   const key = value ?? 'e';
@@ -52,10 +42,6 @@ export default function ProfileScreen() {
   const [changing, setChanging] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [passwordOk, setPasswordOk] = useState(false);
-  const [quality, setQuality] = useState<string>('Lossless');
-  const [offline, setOffline] = useState(true);
-  const [crossfade, setCrossfade] = useState(false);
-  const [explicit, setExplicit] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -277,31 +263,18 @@ export default function ProfileScreen() {
         </Text>
       ) : null}
 
-      <SectionLabel>Playback</SectionLabel>
-      <Segmented options={QUALITY} value={quality} onChange={setQuality} style={{ marginTop: 0 }} />
+      {/* The whole Playback section is gone: a Normal/High/Lossless selector
+          over 30-second AAC previews, plus three switches that held state and
+          changed nothing. "Offline downloads" defaulted to on, which claimed
+          music was being kept on the device. None of the four had an
+          implementation behind it, and a control that lies is worse than no
+          control — the same argument that removed the seeded content.
 
-      <View style={{ gap: s(7), marginTop: s(10) }}>
-        <AeroSwitch
-          title="Offline downloads"
-          subtitle="Keep saved music on device"
-          value={offline}
-          onChange={setOffline}
-        />
-        <AeroSwitch
-          title="Crossfade"
-          subtitle="Blend tracks by 6 seconds"
-          value={crossfade}
-          onChange={setCrossfade}
-        />
-        <AeroSwitch
-          title="Explicit content"
-          subtitle="Allow in recommendations"
-          value={explicit}
-          onChange={setExplicit}
-        />
-      </View>
+          They come back when there is something to configure: real audio for
+          the quality selector, a download path for offline, a crossfade in the
+          player, and a content filter with an actual source of ratings. */}
 
-      <View style={{ flexDirection: 'row', gap: s(8), marginTop: s(14) }}>
+      <View style={{ flexDirection: 'row', gap: s(8), marginTop: s(18) }}>
         <AeroButton
           label={saving ? 'Saving…' : 'Save changes'}
           style={{ flex: 1 }}

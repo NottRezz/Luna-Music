@@ -24,6 +24,7 @@ import { C, F, R, SH, s } from '@/constants/aero';
 import { useLibrary } from '@/providers/library';
 import { usePlayer } from '@/providers/player';
 import { useUI } from '@/providers/ui';
+import { artOf } from '@/types/music';
 
 const VIEWS = ['Songs', 'Albums', 'Artists'] as const;
 
@@ -114,6 +115,7 @@ export default function LibraryScreen() {
                 </View>
               </Press>
             ))
+          : grid ? null
           : matches.map((t, i) => (
               <TrackRow
                 key={t.id}
@@ -125,6 +127,44 @@ export default function LibraryScreen() {
                 onLongPress={() => promptAddToPlaylist(t)}
               />
             ))}
+
+        {/* The grid toggle used to hold state and change nothing. Two columns
+            of cover art, which is the point of a grid view — the row list
+            already shows the metadata. */}
+        {!groups && grid && matches.length > 0 ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(10) }}>
+            {matches.map((t, i) => (
+              <Press
+                key={t.id}
+                onPress={() => play(matches, i, { kind: 'Playing from library', name: 'Your library' })}
+                onLongPress={() => promptAddToPlaylist(t)}
+                scale={0.97}
+                style={{ width: '47.5%', flexGrow: 1 }}>
+                <View>
+                  <Art
+                    source={artOf(t)}
+                    size={s(150)}
+                    radius={R.md}
+                    style={[SH.art, { width: '100%' }]}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      marginTop: s(6),
+                      fontFamily: F.extrabold,
+                      fontSize: s(11.5),
+                      color: current?.id === t.id ? C.lunaBlue : C.ink,
+                    }}>
+                    {t.title}
+                  </Text>
+                  <Text numberOfLines={1} style={{ fontFamily: F.bold, fontSize: s(9.5), color: C.ink3 }}>
+                    {t.artist}
+                  </Text>
+                </View>
+              </Press>
+            ))}
+          </View>
+        ) : null}
 
         {/* Two different empties: a filter that matched nothing is a dead end,
             an untouched library is a starting point. They need different copy. */}

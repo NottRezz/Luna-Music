@@ -16,12 +16,14 @@ import { Sheet, SheetGrabber } from '@/components/aero/sheet';
 import { Icon } from '@/components/aero/icon';
 import { C, F, G, R, SCROLL, SH, s } from '@/constants/aero';
 import { useLibrary } from '@/providers/library';
+import { useToast } from '@/providers/toast';
 import { useUI } from '@/providers/ui';
 import { artOf } from '@/types/music';
 
 export function AddToPlaylist() {
   const { pendingTrack, dismissAddToPlaylist } = useUI();
   const { playlists, createPlaylist, addToPlaylist } = useLibrary();
+  const { notify } = useToast();
   const [name, setName] = useState('');
 
   const mine = playlists;
@@ -33,9 +35,10 @@ export function AddToPlaylist() {
 
   const add = (playlistId: string) => {
     if (!pendingTrack) return;
-    void addToPlaylist(playlistId, pendingTrack).catch((err) =>
-      console.warn('addToPlaylist failed:', err),
-    );
+    void addToPlaylist(playlistId, pendingTrack).catch((err) => {
+      console.warn('addToPlaylist failed:', err);
+      notify('Could not add that song to the playlist.');
+    });
     close();
   };
 

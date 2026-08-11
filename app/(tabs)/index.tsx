@@ -5,10 +5,10 @@
  *
  * The browse sections were the mockup's verbatim, which meant they printed
  * fiction: four playlists the account did not own, five searches it had not
- * run, three tracks it had not played, and a "Luna Radio" channel with 2,418
- * listeners that does not exist. Each one now renders the account's own data or
- * an empty state that says what to do. Moods stay because each runs a real
- * search — they are the only thing here a new account can act on.
+ * run, three tracks it had not played, a "Luna Radio" channel with 2,418
+ * listeners that does not exist, and four mood tiles implying a curated model
+ * behind a plain text search. What is left is the account's own data, an empty
+ * state where it has none, and a search field that does exactly what it says.
  */
 
 import { useRouter } from 'expo-router';
@@ -16,14 +16,15 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 
 import { Art } from '@/components/aero/art';
+import { SearchIcon } from '@/components/aero/icon';
 import { Chip, Field, Grad, Press, SectionLabel } from '@/components/aero/primitives';
 import { QueueRow, TrackRow } from '@/components/aero/track-row';
 import { Empty } from '@/components/empty';
 import { Screen } from '@/components/screen';
-import { C, F, G, R, SCROLL, SH, s, textShadow } from '@/constants/aero';
-import { MOODS } from '@/constants/browse';
+import { C, F, G, R, SCROLL, SH, s } from '@/constants/aero';
 import { useLibrary } from '@/providers/library';
 import { searchItunes, usePlayer } from '@/providers/player';
+import { useToast } from '@/providers/toast';
 import { useUI } from '@/providers/ui';
 import type { Track } from '@/types/music';
 
@@ -33,6 +34,7 @@ export default function SearchScreen() {
     useLibrary();
   const { play, track: current, playing } = usePlayer();
   const { promptAddToPlaylist } = useUI();
+  const { notify } = useToast();
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Track[] | null>(null);
@@ -55,12 +57,15 @@ export default function SearchScreen() {
       } catch (err) {
         if (token !== searchToken.current) return;
         console.warn('Search failed:', err);
-        setResults([]);
+        // Not the same thing as zero results, and it used to render as
+        // "Nothing matched" — which blames the query for a network failure.
+        setResults(null);
+        notify('Search failed. Check your connection and try again.');
       } finally {
         if (token === searchToken.current) setLoading(false);
       }
     },
-    [rememberSearch],
+    [rememberSearch, notify],
   );
 
   const clear = () => {
@@ -91,6 +96,8 @@ export default function SearchScreen() {
           // (`::-webkit-search-cancel-button`). Clearing lives on the results
           // header instead.
         />
+        {/* Was a green "AI" button, which ran exactly the same plain iTunes
+            search as the return key. It is a search button, so it says so. */}
         <Press onPress={() => run(query)}>
           <Grad
             g={G.btnGreen}
@@ -102,16 +109,7 @@ export default function SearchScreen() {
               justifyContent: 'center',
               ...SH.btn,
             }}>
-            <Text
-              style={{
-                fontFamily: F.black,
-                fontSize: s(11),
-                letterSpacing: s(11) * 0.06,
-                color: '#fff',
-                ...textShadow(),
-              }}>
-              AI
-            </Text>
+            <SearchIcon size={s(18)} color="#fff" />
           </Grad>
         </Press>
       </View>
@@ -214,36 +212,11 @@ export default function SearchScreen() {
             </ScrollView>
           )}
 
-          <SectionLabel>Moods</SectionLabel>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(8) }}>
-            {MOODS.map((m, i) => (
-              <Press
-                key={m.key}
-                onPress={() => run(m.name)}
-                scale={0.98}
-                style={{ width: '48%', flexGrow: 1 }}>
-                <Grad
-                  g={[G.mood1, G.mood2, G.mood3, G.mood4][i]}
-                  style={{
-                    height: s(72),
-                    borderRadius: R.md,
-                    padding: s(10),
-                    paddingHorizontal: s(11),
-                    justifyContent: 'space-between',
-                    overflow: 'hidden',
-                    ...SH.btn,
-                  }}>
-                  <Text style={{ fontSize: s(17) }}>{m.glyph}</Text>
-                  <View>
-                    <Text style={{ fontFamily: F.black, fontSize: s(12.5), color: '#fff' }}>{m.name}</Text>
-                    <Text style={{ fontFamily: F.bold, fontSize: s(9), color: 'rgba(255,255,255,.82)' }}>
-                      {m.sub}
-                    </Text>
-                  </View>
-                </Grad>
-              </Press>
-            ))}
-          </View>
+          {/* Moods are gone with the rest of the browse chrome. They ran a real
+              iTunes search for their own name, so they were not dishonest the
+              way the radio ticker was — but "Focus / Deep & clean" implied a
+              curated mood model that does not exist, and searching the literal
+              word "Focus" is not that. A real one filters something. */}
 
           {/* `.ticker` is gone. It advertised "Luna Radio · Aero Channel" with
               "2,418 listening now" over a button that ran a text search for

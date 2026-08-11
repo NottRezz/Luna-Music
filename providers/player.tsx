@@ -11,6 +11,7 @@ import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-au
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useLibrary } from '@/providers/library';
+import { useToast } from '@/providers/toast';
 import { applePreview, fromItunes, type Track } from '@/types/music';
 
 type Source = { kind: string; name: string };
@@ -82,10 +83,13 @@ export function useVolume() {
 }
 
 /**
- * Seeded demo tracks are fictional and carry no audio. Rather than leave half
- * the UI dead, borrow a real preview from iTunes for the title so transport,
- * seeking and the meters are all exercisable. Display metadata stays the
- * mockup's. Resolved URLs are cached for the session.
+ * Most tracks arrive from a search and already carry their own `previewUrl`.
+ * This covers the ones that do not — a row restored from the `tracks` cache
+ * whose URL was never stored, or was dropped on read for failing the host check
+ * (LM-23). Resolved URLs are cached for the session.
+ *
+ * It used to matter far more: it existed so the fictional seeded demo tracks
+ * had something to play. Those are gone.
  */
 const previewCache = new Map<string, string | null>();
 /** Deduplicates concurrent lookups — a prefetch and a tap can race. */
@@ -116,9 +120,8 @@ function resolvePreview(track: Track): Promise<string | null> {
   if (pending) return pending;
 
   const p = lookup(`${track.title} ${track.artist}`)
-    // The artists are invented, so "Digital Rain SynthWave Pro" matches nothing
-    // and the track silently refused to play. The title alone almost always
-    // finds something.
+    // Title and artist together can miss where the title alone matches, so fall
+    // back rather than give up.
     .then((url) => url ?? lookup(track.title))
     .then((url) => {
       if (!url) console.warn(`No preview found for "${track.title}"`);
@@ -143,6 +146,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const player = useAudioPlayer(null, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
   const { isFavorite, toggleFavorite, rememberPlay } = useLibrary();
+  const { notify } = useToast();
 
   // Empty until something is played. This used to start as the mockup's eight
   // demo tracks with index 1, so a brand new account launched into a dock
@@ -180,9 +184,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     (v: boolean) => {
       if (!track) return;
       if (v === isFavorite(track.id)) return;
-      void toggleFavorite(track).catch((err) => console.warn('toggleFavorite failed:', err));
+      void toggleFavorite(track).catch((err) => {
+        console.warn('toggleFavorite failed:', err);
+        // The heart has already flipped optimistically, so silence here meant
+        // the like looked saved until the next launch proved otherwise.
+        notify(v ? 'Could not save that like.' : 'Could not remove that like.');
+      });
     },
-    [track, isFavorite, toggleFavorite],
+    [track, isFavorite, toggleFavorite, notify],
   );
 
   /* --- Volume ------------------------------------------------ */
@@ -204,14 +213,33 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
 
+  /**
+   * Load a track and, by default, start it.
+   *
+   * LM-7 was here. Both failure exits used to `return` silently: the transport
+   * stayed lit, `loadedId` kept pointing at the *previous* track, and the only
+   * trace was a `console.warn`. So the app looked like it was playing and was
+   * not — and because `loadedId` was stale, pressing play again re-loaded the
+   * old track rather than retrying this one.
+   *
+   * Now both exits say so and clear `loadedId`, which is what makes the next
+   * press a real retry.
+   */
   const load = useCallback(
     async (t: Track, autoplay = true) => {
       const token = ++loadToken.current;
       setLoading(true);
       try {
         const uri = await resolvePreview(t);
+        // A newer load won. Not a failure — say nothing, and leave the state
+        // belonging to whichever track is actually current.
         if (token !== loadToken.current) return;
-        if (!uri) return;
+
+        if (!uri) {
+          loadedId.current = null;
+          notify(`No audio found for “${t.title}”.`);
+          return;
+        }
 
         // Already normalised and host-checked by applePreview, at every source:
         // the iTunes lookup, a search result, and a row read back out of the
@@ -223,12 +251,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         loadedId.current = t.id;
         if (autoplay) player.play();
       } catch (err) {
+        if (token !== loadToken.current) return;
+        loadedId.current = null;
         console.warn('Failed to load track:', err);
+        notify(`Could not play “${t.title}”. Check your connection.`);
       } finally {
         if (token === loadToken.current) setLoading(false);
       }
     },
-    [player],
+    [player, notify],
   );
 
   const play = useCallback(

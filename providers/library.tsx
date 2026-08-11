@@ -30,6 +30,7 @@ import {
   renamePlaylist as dbRenamePlaylist,
 } from '@/lib/db';
 import { useAuth } from '@/providers/auth';
+import { useToast } from '@/providers/toast';
 import { runtime, type Playlist, type Track } from '@/types/music';
 
 const RECENTS_KEY = 'luna:recents:v1';
@@ -80,6 +81,7 @@ export function useLibrary() {
 
 export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const { user, ready: authReady } = useAuth();
+  const { notify } = useToast();
   const userId = user?.id ?? null;
 
   const [userPlaylists, setUserPlaylists] = useState<Playlist[]>([]);
@@ -105,10 +107,13 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       setHistory(recent.map(({ track, note }) => ({ track, note })));
     } catch (err) {
       console.warn('Failed to sync library from Supabase:', err);
+      // Without this the screens render empty and indistinguishable from a
+      // genuinely empty account, which reads as data loss.
+      notify('Could not load your library. Check your connection.');
     } finally {
       setSyncing(false);
     }
-  }, []);
+  }, [notify]);
 
   // Search chips stay local; everything account-scoped comes from Supabase.
   useEffect(() => {
