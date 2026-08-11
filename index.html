@@ -21,9 +21,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Nunito:wght@600;700;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;700;800&family=Nunito:wght@600;700;800;900&display=swap"
       rel="stylesheet"
     />
+    <!--
+      Request only the weights that are actually set somewhere.
+
+      Archivo 600 was in this list and used nowhere, and Google's CDN answered
+      404 for that one file — a console error on every page load, for a face
+      nothing would have rendered in. Nunito 600 stays: the font-weight specimen
+      on the design card renders Semi/Bold/Extra/Black, so 600 is on screen.
+
+      Archivo carries the site's own voice at 400/500/700/800; Nunito is used
+      only for app-voice elements, at 600 and above.
+    -->
   </head>
   <body>
     <!--
