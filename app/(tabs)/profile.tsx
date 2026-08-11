@@ -9,15 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { Art } from '@/components/aero/art';
-import {
-  AeroButton,
-  AeroSwitch,
-  Card,
-  Field,
-  Press,
-  SectionLabel,
-  Segmented,
-} from '@/components/aero/primitives';
+import { AeroButton, Card, Field, Press, SectionLabel } from '@/components/aero/primitives';
 import { Icon } from '@/components/aero/icon';
 import { Screen } from '@/components/screen';
 import { C, F, R, SH, s, textShadow } from '@/constants/aero';
@@ -25,8 +17,6 @@ import type { ArtKey } from '@/constants/art';
 import { updateProfile } from '@/lib/db/profiles';
 import { useAuth } from '@/providers/auth';
 import { useLibrary } from '@/providers/library';
-
-const QUALITY = ['Normal', 'High', 'Lossless'] as const;
 
 function asArtKey(value: string | null | undefined): ArtKey {
   const key = value ?? 'e';
@@ -36,7 +26,7 @@ function asArtKey(value: string | null | undefined): ArtKey {
 }
 
 export default function ProfileScreen() {
-  const { user, profile, signOut, updateLocalProfile, refreshProfile } = useAuth();
+  const { user, profile, signOut, changePassword, updateLocalProfile, refreshProfile } = useAuth();
   const { library, playlists, history } = useLibrary();
 
   const displayName = profile?.display_name || profile?.username || user?.email?.split('@')[0] || 'Listener';
@@ -47,11 +37,11 @@ export default function ProfileScreen() {
   const [nameDraft, setNameDraft] = useState(displayName);
   const [usernameDraft, setUsernameDraft] = useState(username);
   const [reveal, setReveal] = useState(false);
-  const [password, setPassword] = useState('••••••••');
-  const [quality, setQuality] = useState<string>('Lossless');
-  const [offline, setOffline] = useState(true);
-  const [crossfade, setCrossfade] = useState(false);
-  const [explicit, setExplicit] = useState(true);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [changing, setChanging] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [passwordOk, setPasswordOk] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -63,11 +53,34 @@ export default function ProfileScreen() {
   const stats = useMemo(
     () => [
       { v: String(library.length), k: 'Songs' },
-      { v: String(playlists.filter((p) => p.custom).length), k: 'Playlists' },
+      { v: String(playlists.length), k: 'Playlists' },
       { v: String(history.length), k: 'Recent' },
     ],
     [library.length, playlists, history.length],
   );
+
+  const onChangePassword = async () => {
+    setPasswordMessage(null);
+    setPasswordOk(false);
+    if (!currentPassword || !newPassword) {
+      setPasswordMessage('Enter your current password and a new one.');
+      return;
+    }
+    setChanging(true);
+    const { error } = await changePassword(currentPassword, newPassword);
+    setChanging(false);
+    if (error) {
+      setPasswordMessage(error);
+      return;
+    }
+    // Clear both fields on success so the new password is not left sitting in
+    // component state, or on screen behind the reveal toggle.
+    setCurrentPassword('');
+    setNewPassword('');
+    setReveal(false);
+    setPasswordOk(true);
+    setPasswordMessage('Password updated.');
+  };
 
   const onSave = async () => {
     if (!user) return;
@@ -180,14 +193,22 @@ export default function ProfileScreen() {
           />
         </FormRow>
 
-        <FormRow label="Password">
+      </View>
+
+      {/* Was a disabled field showing eight fixed bullets, so an account whose
+          password was compromised could not replace it and there is still no
+          reset-by-email flow. See LM-27. */}
+      <SectionLabel>Change password</SectionLabel>
+      <View style={{ gap: s(9) }}>
+        <FormRow label="Current password">
           <Field
             icon="lock"
-            value={password}
-            onChangeText={setPassword}
+            value={currentPassword}
+            onChangeText={setCurrentPassword}
             secureTextEntry={!reveal}
-            editable={false}
             autoComplete="current-password"
+            placeholder="Your password now"
+            editable={!changing}
             right={
               <Press onPress={() => setReveal(!reveal)} scale={0.9}>
                 <Icon name="eye" size={s(16)} color={reveal ? C.lunaBlue : C.ink3} />
@@ -195,6 +216,38 @@ export default function ProfileScreen() {
             }
           />
         </FormRow>
+
+        <FormRow label="New password">
+          <Field
+            icon="lock"
+            value={newPassword}
+            onChangeText={setNewPassword}
+            secureTextEntry={!reveal}
+            autoComplete="new-password"
+            placeholder="At least 6 characters"
+            editable={!changing}
+            onSubmitEditing={() => void onChangePassword()}
+            returnKeyType="go"
+          />
+        </FormRow>
+
+        {passwordMessage ? (
+          <Text
+            style={{
+              fontFamily: F.bold,
+              fontSize: s(11),
+              color: passwordOk ? C.ink2 : '#b42318',
+              marginLeft: s(2),
+            }}>
+            {passwordMessage}
+          </Text>
+        ) : null}
+
+        <AeroButton
+          label={changing ? 'Updating…' : 'Update password'}
+          variant="quiet"
+          onPress={changing ? undefined : () => void onChangePassword()}
+        />
       </View>
 
       {message ? (
@@ -210,31 +263,18 @@ export default function ProfileScreen() {
         </Text>
       ) : null}
 
-      <SectionLabel>Playback</SectionLabel>
-      <Segmented options={QUALITY} value={quality} onChange={setQuality} style={{ marginTop: 0 }} />
+      {/* The whole Playback section is gone: a Normal/High/Lossless selector
+          over 30-second AAC previews, plus three switches that held state and
+          changed nothing. "Offline downloads" defaulted to on, which claimed
+          music was being kept on the device. None of the four had an
+          implementation behind it, and a control that lies is worse than no
+          control — the same argument that removed the seeded content.
 
-      <View style={{ gap: s(7), marginTop: s(10) }}>
-        <AeroSwitch
-          title="Offline downloads"
-          subtitle="Keep saved music on device"
-          value={offline}
-          onChange={setOffline}
-        />
-        <AeroSwitch
-          title="Crossfade"
-          subtitle="Blend tracks by 6 seconds"
-          value={crossfade}
-          onChange={setCrossfade}
-        />
-        <AeroSwitch
-          title="Explicit content"
-          subtitle="Allow in recommendations"
-          value={explicit}
-          onChange={setExplicit}
-        />
-      </View>
+          They come back when there is something to configure: real audio for
+          the quality selector, a download path for offline, a crossfade in the
+          player, and a content filter with an actual source of ratings. */}
 
-      <View style={{ flexDirection: 'row', gap: s(8), marginTop: s(14) }}>
+      <View style={{ flexDirection: 'row', gap: s(8), marginTop: s(18) }}>
         <AeroButton
           label={saving ? 'Saving…' : 'Save changes'}
           style={{ flex: 1 }}

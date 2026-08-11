@@ -1,26 +1,20 @@
 /**
  * Register — Supabase Auth sign-up (ADR 4).
+ *
+ * Shares its frame with login.tsx via components/auth-shell.tsx.
  */
 
 import { Link, Redirect } from 'expo-router';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Text, View } from 'react-native';
 
-import { Grad, AeroButton, Field, Press } from '@/components/aero/primitives';
+import { AeroButton, Field, Press } from '@/components/aero/primitives';
 import { Icon } from '@/components/aero/icon';
-import { C, F, G, R, SH, s, textShadow } from '@/constants/aero';
+import { AuthFooterLink, AuthFooterText, AuthLabel, AuthShell } from '@/components/auth-shell';
+import { C, F, s } from '@/constants/aero';
 import { useAuth } from '@/providers/auth';
 
 export default function RegisterScreen() {
-  const insets = useSafeAreaInsets();
   const { session, ready, signUp, configured } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -54,153 +48,86 @@ export default function RegisterScreen() {
   };
 
   return (
-    <Grad g={G.app} style={{ flex: 1 }}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          contentContainerStyle={{
-            flexGrow: 1,
-            paddingTop: insets.top + s(36),
-            paddingBottom: insets.bottom + s(24),
-            paddingHorizontal: s(22),
-            justifyContent: 'center',
-          }}
-          keyboardShouldPersistTaps="handled">
-          <Text
-            style={{
-              fontFamily: F.black,
-              fontSize: s(34),
-              color: '#fff',
-              ...textShadow(0.35, 8),
-            }}>
-            Join Luna
-          </Text>
-          <Text
-            style={{
-              fontFamily: F.bold,
-              fontSize: s(13),
-              color: 'rgba(255,255,255,.82)',
-              marginTop: s(4),
-              marginBottom: s(28),
-            }}>
-            Your library lives on your account — not just this phone.
-          </Text>
+    <AuthShell
+      title="Join Luna"
+      subtitle="Your library lives on your account — not just this phone."
+      footer={
+        <>
+          <AuthFooterText>Already have an account?</AuthFooterText>
+          <Link href="/(auth)/login" asChild>
+            <Press>
+              <AuthFooterLink>Sign in</AuthFooterLink>
+            </Press>
+          </Link>
+        </>
+      }>
+      {!configured ? (
+        <Text style={{ fontFamily: F.bold, fontSize: s(11), color: C.ink2, lineHeight: s(16) }}>
+          Configure Supabase env vars before creating an account.
+        </Text>
+      ) : null}
 
-          <View
-            style={{
-              borderRadius: R.lg,
-              backgroundColor: 'rgba(255,255,255,.78)',
-              borderWidth: 1,
-              borderColor: C.hairline,
-              padding: s(16),
-              gap: s(12),
-              ...SH.card,
-            }}>
-            {!configured ? (
-              <Text style={{ fontFamily: F.bold, fontSize: s(11), color: C.ink2, lineHeight: s(16) }}>
-                Configure Supabase env vars before creating an account.
-              </Text>
-            ) : null}
+      <View>
+        <AuthLabel>Display name</AuthLabel>
+        <Field
+          icon="person"
+          value={displayName}
+          onChangeText={setDisplayName}
+          autoComplete="name"
+          placeholder="Alex Rivera"
+          editable={!busy}
+        />
+      </View>
 
-            <View>
-              <Label>Display name</Label>
-              <Field
-                icon="person"
-                value={displayName}
-                onChangeText={setDisplayName}
-                autoComplete="name"
-                placeholder="Alex Rivera"
-                editable={!busy}
-              />
-            </View>
+      <View>
+        <AuthLabel>Email</AuthLabel>
+        <Field
+          icon="mail"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          placeholder="you@example.com"
+          editable={!busy}
+        />
+      </View>
 
-            <View>
-              <Label>Email</Label>
-              <Field
-                icon="mail"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                placeholder="you@example.com"
-                editable={!busy}
-              />
-            </View>
+      <View>
+        <AuthLabel>Password</AuthLabel>
+        <Field
+          icon="lock"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!reveal}
+          autoComplete="new-password"
+          placeholder="At least 6 characters"
+          editable={!busy}
+          onSubmitEditing={() => void onSubmit()}
+          returnKeyType="go"
+          right={
+            <Press onPress={() => setReveal(!reveal)} scale={0.9}>
+              <Icon name="eye" size={s(16)} color={reveal ? C.lunaBlue : C.ink3} />
+            </Press>
+          }
+        />
+      </View>
 
-            <View>
-              <Label>Password</Label>
-              <Field
-                icon="lock"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!reveal}
-                autoComplete="new-password"
-                placeholder="At least 6 characters"
-                editable={!busy}
-                right={
-                  <Press onPress={() => setReveal(!reveal)} scale={0.9}>
-                    <Icon name="eye" size={s(16)} color={reveal ? C.lunaBlue : C.ink3} />
-                  </Press>
-                }
-              />
-            </View>
+      {error ? (
+        <Text style={{ fontFamily: F.bold, fontSize: s(11), color: '#b42318' }}>{error}</Text>
+      ) : null}
+      {info ? (
+        <Text style={{ fontFamily: F.bold, fontSize: s(11), color: C.ink2 }}>{info}</Text>
+      ) : null}
 
-            {error ? (
-              <Text style={{ fontFamily: F.bold, fontSize: s(11), color: '#b42318' }}>{error}</Text>
-            ) : null}
-            {info ? (
-              <Text style={{ fontFamily: F.bold, fontSize: s(11), color: C.ink2 }}>{info}</Text>
-            ) : null}
+      <AeroButton
+        label={busy ? 'Creating…' : 'Create account'}
+        variant="green"
+        onPress={busy ? undefined : () => void onSubmit()}
+        style={{ marginTop: s(4) }}
+      />
 
-            <AeroButton
-              label={busy ? 'Creating…' : 'Create account'}
-              variant="green"
-              onPress={busy ? undefined : () => void onSubmit()}
-              style={{ marginTop: s(4) }}
-            />
-
-            {busy ? <ActivityIndicator color={C.lunaBlue} /> : null}
-          </View>
-
-          <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: s(18), gap: s(6) }}>
-            <Text style={{ fontFamily: F.bold, fontSize: s(12), color: 'rgba(255,255,255,.85)' }}>
-              Already have an account?
-            </Text>
-            <Link href="/(auth)/login" asChild>
-              <Press>
-                <Text
-                  style={{
-                    fontFamily: F.extrabold,
-                    fontSize: s(12),
-                    color: '#fff',
-                    textDecorationLine: 'underline',
-                  }}>
-                  Sign in
-                </Text>
-              </Press>
-            </Link>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Grad>
-  );
-}
-
-function Label({ children }: { children: string }) {
-  return (
-    <Text
-      style={{
-        fontFamily: F.extrabold,
-        fontSize: s(9.5),
-        letterSpacing: s(9.5) * 0.06,
-        color: C.ink2,
-        textTransform: 'uppercase',
-        marginBottom: s(5),
-        marginLeft: s(2),
-      }}>
-      {children}
-    </Text>
+      {busy ? <ActivityIndicator color={C.lunaBlue} /> : null}
+    </AuthShell>
   );
 }

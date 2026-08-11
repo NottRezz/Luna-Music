@@ -18,6 +18,7 @@ import { AeroButton, Field, Grad, Press, SectionLabel } from '@/components/aero/
 import { Sheet, SheetGrabber } from '@/components/aero/sheet';
 import { C, DOWN, F, G, SCROLL, SH, s } from '@/constants/aero';
 import { useLibrary } from '@/providers/library';
+import { useToast } from '@/providers/toast';
 import { useUI } from '@/providers/ui';
 
 export function PlaylistManager() {
@@ -26,6 +27,7 @@ export function PlaylistManager() {
     setActivePlaylist, createPlaylist, renamePlaylist, deletePlaylist,
   } = useLibrary();
   const { managerOpen, closeManager } = useUI();
+  const { notify } = useToast();
 
   const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
@@ -41,14 +43,18 @@ export function PlaylistManager() {
         setName('');
         closeManager();
       })
-      .catch((err) => console.warn('createPlaylist failed:', err));
+      .catch((err) => {
+        console.warn('createPlaylist failed:', err);
+        notify('Could not create that playlist.');
+      });
   };
 
   const commitRename = () => {
     if (editing && draft.trim()) {
-      void renamePlaylist(editing, draft.trim()).catch((err) =>
-        console.warn('renamePlaylist failed:', err),
-      );
+      void renamePlaylist(editing, draft.trim()).catch((err) => {
+        console.warn('renamePlaylist failed:', err);
+        notify('Could not rename that playlist.');
+      });
     }
     setEditing(null);
   };
@@ -76,6 +82,18 @@ export function PlaylistManager() {
         </View>
 
         <SectionLabel>Switch playlist</SectionLabel>
+        {playlists.length === 0 ? (
+          <Text
+            style={{
+              fontFamily: F.bold,
+              fontSize: s(10.5),
+              lineHeight: s(15),
+              color: C.ink3,
+              paddingVertical: s(6),
+            }}>
+            Nothing to switch to yet — name one above and press Create.
+          </Text>
+        ) : null}
         <ScrollView style={{ flexShrink: 1 }} showsVerticalScrollIndicator={false} {...SCROLL}>
           <View style={{ gap: s(5) }}>
             {playlists.map((p) => {
@@ -115,17 +133,17 @@ export function PlaylistManager() {
                           style={{ fontFamily: F.extrabold, fontSize: s(12), color: C.ink }}>
                           {p.name}
                         </Text>
-                        {/* Printed figures for the seeded playlists, real ones
-                            for the user's own — matching the hero and carousel. */}
                         <Text style={{ fontFamily: F.bold, fontSize: s(9.5), color: C.ink3 }}>
-                          {p.custom ? 'Yours' : p.owner} · {statsOf(p).count} tracks
+                          {statsOf(p).count} {statsOf(p).count === '1' ? 'track' : 'tracks'}
                         </Text>
                       </View>
                     </Press>
                   )}
 
-                  {/* Seeded playlists stand in for server data, so they are read-only. */}
-                  {p.custom && !isEditing ? (
+                  {/* Every playlist here is the account's own now, so all of
+                      them rename and delete. This used to be gated on `custom`
+                      because the four seeded ones could not be touched. */}
+                  {!isEditing ? (
                     <View style={{ flexDirection: 'row', gap: s(4) }}>
                       <MiniBtn
                         icon="pencil"
@@ -138,9 +156,10 @@ export function PlaylistManager() {
                         icon="trash"
                         tone="red"
                         onPress={() =>
-                          void deletePlaylist(p.id).catch((err) =>
-                            console.warn('deletePlaylist failed:', err),
-                          )
+                          void deletePlaylist(p.id).catch((err) => {
+                            console.warn('deletePlaylist failed:', err);
+                            notify('Could not delete that playlist.');
+                          })
                         }
                       />
                     </View>

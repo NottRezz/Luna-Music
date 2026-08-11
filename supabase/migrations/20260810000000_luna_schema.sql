@@ -130,12 +130,15 @@ declare
   candidate text;
   n integer := 0;
 begin
-  base_username := lower(regexp_replace(
-    split_part(coalesce(new.email, 'user'), '@', 1),
+  -- lower() FIRST. regexp_replace is case-sensitive, so stripping against
+  -- '[^a-z0-9_]' before folding deletes every capital letter instead of
+  -- lowercasing it, and 'Alex.Rivera@…' silently becomes 'lexivera'.
+  base_username := regexp_replace(
+    lower(split_part(coalesce(new.email, 'user'), '@', 1)),
     '[^a-z0-9_]',
     '',
     'g'
-  ));
+  );
   if base_username is null or length(base_username) < 3 then
     base_username := 'user';
   end if;
@@ -184,7 +187,21 @@ create policy "profiles_update_own"
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
--- tracks: any signed-in user may read/upsert cached metadata
+-- tracks: any signed-in user may read the cache and add a row that is not
+-- there yet. Deliberately NO update policy — see LM-6 and the migration
+-- 20260810120000_tracks_read_insert_only.sql that removed it.
+--
+-- `tracks` is one shared table keyed by iTunes id, referenced by every user's
+-- playlists, favorites and history. An update policy permissive enough to let
+-- the client refresh metadata is permissive enough for any account to rewrite
+-- any row's title, artist or preview_url for everyone, so there is no useful
+-- middle ground short of a `security definer` function.
+--
+-- The client must therefore write with `on conflict do nothing`
+-- (`ignoreDuplicates: true` in lib/db/tracks.ts). A plain upsert compiles to
+-- `on conflict do update`, and Postgres checks the UPDATE policy on the
+-- conflicting row — with none present that raises 42501 on every write after
+-- the first.
 drop policy if exists "tracks_select_authenticated" on public.tracks;
 create policy "tracks_select_authenticated"
   on public.tracks for select
@@ -198,11 +215,6 @@ create policy "tracks_insert_authenticated"
   with check (true);
 
 drop policy if exists "tracks_update_authenticated" on public.tracks;
-create policy "tracks_update_authenticated"
-  on public.tracks for update
-  to authenticated
-  using (true)
-  with check (true);
 
 -- playlists
 drop policy if exists "playlists_select_own" on public.playlists;

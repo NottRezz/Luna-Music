@@ -41,10 +41,8 @@ export async function fetchUserPlaylists(userId: string): Promise<{
     return {
       id: row.id,
       name: row.name,
-      owner: 'You',
       art: (row.art_key as Playlist['art']) || artFor(row.id),
       trackIds,
-      custom: true,
     };
   });
 
@@ -65,10 +63,8 @@ export async function createPlaylist(userId: string, name: string): Promise<Play
   return {
     id: data.id,
     name: data.name,
-    owner: 'You',
     art: (data.art_key as Playlist['art']) || art,
     trackIds: [],
-    custom: true,
   };
 }
 

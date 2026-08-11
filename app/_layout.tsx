@@ -20,10 +20,12 @@ import { Grad } from '@/components/aero/primitives';
 import { Dock } from '@/components/player/dock';
 import { NowPlaying } from '@/components/player/now-playing';
 import { PlaylistManager } from '@/components/playlist-manager';
+import { Toaster } from '@/components/toaster';
 import { G } from '@/constants/aero';
 import { AuthProvider, useAuth } from '@/providers/auth';
 import { LibraryProvider } from '@/providers/library';
 import { PlayerProvider } from '@/providers/player';
+import { ToastProvider } from '@/providers/toast';
 import { UIProvider } from '@/providers/ui';
 
 export const unstable_settings = {
@@ -53,17 +55,21 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <LibraryProvider>
-            <PlayerProvider>
-              <UIProvider>
-                <Grad g={G.app} style={{ flex: 1 }}>
-                  <AuthGate />
-                </Grad>
-              </UIProvider>
-            </PlayerProvider>
-          </LibraryProvider>
-        </AuthProvider>
+        {/* Outermost on purpose: every provider below it reports failures
+            through `notify`, and a provider cannot read one it is nested in. */}
+        <ToastProvider>
+          <AuthProvider>
+            <LibraryProvider>
+              <PlayerProvider>
+                <UIProvider>
+                  <Grad g={G.app} style={{ flex: 1 }}>
+                    <AuthGate />
+                  </Grad>
+                </UIProvider>
+              </PlayerProvider>
+            </LibraryProvider>
+          </AuthProvider>
+        </ToastProvider>
         <StatusBar style="light" />
       </SafeAreaProvider>
     </GestureHandlerRootView>
@@ -110,6 +116,10 @@ function AuthGate() {
           <PlaylistManager />
         </>
       ) : null}
+
+      {/* Last, so it draws over the sheets — a failure raised from inside one
+          has to be visible without closing it first. */}
+      <Toaster />
     </View>
   );
 }

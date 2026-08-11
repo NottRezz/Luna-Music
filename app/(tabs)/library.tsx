@@ -1,9 +1,14 @@
 /**
  * Library — `#view-library` in design/mockup/index.html.
  *
- * Songs lists everything the app knows about, including tracks pulled in from
- * search. Albums and Artists group the same pool rather than inventing a second
- * data source.
+ * Songs lists what the account has saved. Albums and Artists group that same
+ * pool rather than inventing a second data source.
+ *
+ * "Browse genres" is gone with the rest of the filler. Its four tiles printed
+ * track counts — 142 Synthwave, 96 Ambient, 210 Lo-Fi, 78 Trance — for a genre
+ * model that does not exist, and the `Press` around each one had no `onPress`,
+ * so tapping did nothing. Numbers nobody counted, over a control that did not
+ * work.
  */
 
 import { useMemo, useState } from 'react';
@@ -11,15 +16,15 @@ import { Text, View } from 'react-native';
 
 import { Art } from '@/components/aero/art';
 import { Icon } from '@/components/aero/icon';
-import { Field, Press, SectionLabel, Segmented } from '@/components/aero/primitives';
+import { Field, Press, Segmented } from '@/components/aero/primitives';
 import { TrackRow } from '@/components/aero/track-row';
+import { Empty } from '@/components/empty';
 import { Screen } from '@/components/screen';
-import { C, F, R, SH, s, textShadow } from '@/constants/aero';
-import { GENRES } from '@/constants/seed';
+import { C, F, R, SH, s } from '@/constants/aero';
 import { useLibrary } from '@/providers/library';
 import { usePlayer } from '@/providers/player';
 import { useUI } from '@/providers/ui';
-import type { ArtKey } from '@/constants/art';
+import { artOf } from '@/types/music';
 
 const VIEWS = ['Songs', 'Albums', 'Artists'] as const;
 
@@ -110,6 +115,7 @@ export default function LibraryScreen() {
                 </View>
               </Press>
             ))
+          : grid ? null
           : matches.map((t, i) => (
               <TrackRow
                 key={t.id}
@@ -122,40 +128,59 @@ export default function LibraryScreen() {
               />
             ))}
 
-        {matches.length === 0 ? (
-          <Text style={{ fontFamily: F.bold, fontSize: s(11), color: C.ink3 }}>
-            Nothing matched “{filter}”.
-          </Text>
+        {/* The grid toggle used to hold state and change nothing. Two columns
+            of cover art, which is the point of a grid view — the row list
+            already shows the metadata. */}
+        {!groups && grid && matches.length > 0 ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(10) }}>
+            {matches.map((t, i) => (
+              <Press
+                key={t.id}
+                onPress={() => play(matches, i, { kind: 'Playing from library', name: 'Your library' })}
+                onLongPress={() => promptAddToPlaylist(t)}
+                scale={0.97}
+                style={{ width: '47.5%', flexGrow: 1 }}>
+                <View>
+                  <Art
+                    source={artOf(t)}
+                    size={s(150)}
+                    radius={R.md}
+                    style={[SH.art, { width: '100%' }]}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      marginTop: s(6),
+                      fontFamily: F.extrabold,
+                      fontSize: s(11.5),
+                      color: current?.id === t.id ? C.lunaBlue : C.ink,
+                    }}>
+                    {t.title}
+                  </Text>
+                  <Text numberOfLines={1} style={{ fontFamily: F.bold, fontSize: s(9.5), color: C.ink3 }}>
+                    {t.artist}
+                  </Text>
+                </View>
+              </Press>
+            ))}
+          </View>
         ) : null}
-      </View>
 
-      <SectionLabel>Browse genres</SectionLabel>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(10) }}>
-        {GENRES.map((g) => (
-          <Press key={g.name} scale={0.98} style={{ width: '48%', flexGrow: 1 }}>
-            <Art
-              source={g.art as ArtKey}
-              wide
-              radius={R.md}
-              style={{ height: s(62), ...SH.art }}>
-              <View style={{ flex: 1, justifyContent: 'flex-end', paddingVertical: s(8), paddingHorizontal: s(10) }}>
-                <Text style={{ fontFamily: F.black, fontSize: s(12.5), color: '#fff', ...textShadow(0.45, 4) }}>
-                  {g.name}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: F.extrabold,
-                    fontSize: s(8),
-                    letterSpacing: s(8) * 0.12,
-                    color: 'rgba(255,255,255,.92)',
-                    ...textShadow(0.45, 3),
-                  }}>
-                  {g.count} TRACKS
-                </Text>
-              </View>
-            </Art>
-          </Press>
-        ))}
+        {/* Two different empties: a filter that matched nothing is a dead end,
+            an untouched library is a starting point. They need different copy. */}
+        {matches.length === 0 ? (
+          filter.trim() ? (
+            <Text style={{ fontFamily: F.bold, fontSize: s(11), color: C.ink3 }}>
+              Nothing matched “{filter}”.
+            </Text>
+          ) : (
+            <Empty
+              icon="heart"
+              title="Nothing saved yet"
+              hint="Tap the heart while a song is playing and it lands here, on every device you sign in to."
+            />
+          )
+        ) : null}
       </View>
     </Screen>
   );

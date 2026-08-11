@@ -1,24 +1,21 @@
 /**
  * Playlists, favorites, recent searches and listening history.
  *
- * Seeded content from the mockup stays read-only for demo chrome. User-authored
- * data is the primary store and lives in Supabase (ADR 4): playlists,
- * playlist_tracks, favorites, and recently_played. Recent search chips remain
- * local (AsyncStorage) — they are not part of the account sync surface.
+ * Everything here belongs to the signed-in account and comes from Supabase
+ * (ADR 4): playlists, playlist_tracks, favorites, and recently_played. Recent
+ * search chips remain local (AsyncStorage) — they are not part of the account
+ * sync surface.
+ *
+ * There is no seeded content. This provider used to merge the mockup's demo
+ * data underneath the user's, which meant a new account signed in to four
+ * playlists it did not make, six songs it had not saved and three tracks it had
+ * never played. Empty is the correct state for an empty account; the screens
+ * each render their own empty state for it.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, use, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { artFor } from '@/constants/art';
-import {
-  SEED_HISTORY,
-  SEED_LIBRARY,
-  SEED_PLAYLISTS,
-  SEED_RECENTS,
-  SEED_TRACKS,
-  type SeedPlaylist,
-} from '@/constants/seed';
 import {
   addFavorite,
   addTrackToPlaylist,
@@ -33,29 +30,31 @@ import {
   renamePlaylist as dbRenamePlaylist,
 } from '@/lib/db';
 import { useAuth } from '@/providers/auth';
+import { useToast } from '@/providers/toast';
 import { runtime, type Playlist, type Track } from '@/types/music';
 
 const RECENTS_KEY = 'luna:recents:v1';
 
 type LibraryValue = {
-  /** Seeded + user-created, in that order. */
-  playlists: (Playlist | SeedPlaylist)[];
+  /** The account's own playlists. Empty until it creates one. */
+  playlists: Playlist[];
   /** Every track the app knows about, addressable by id. */
   tracks: Map<string, Track>;
-  /** Favorites / "liked" library (seeded demo + user favorites). */
+  /** The account's saved/liked tracks. Empty until it likes one. */
   library: Track[];
   favoriteIds: Set<string>;
   recents: string[];
   history: { track: Track; note: string }[];
-  activePlaylistId: string;
-  activePlaylist: Playlist | SeedPlaylist;
+  /** `null` when the account has no playlists, or none is selected yet. */
+  activePlaylistId: string | null;
+  /** `undefined` when there is nothing to show — the Playlist screen handles it. */
+  activePlaylist: Playlist | undefined;
   ready: boolean;
   syncing: boolean;
 
-  setActivePlaylist: (id: string) => void;
+  setActivePlaylist: (id: string | null) => void;
   tracksOf: (p: Playlist) => Track[];
-  /** Printed figures for seeded playlists, computed ones for user playlists. */
-  statsOf: (p: Playlist | SeedPlaylist) => { count: string; runtime: string; saves: string };
+  statsOf: (p: Playlist) => { count: string; runtime: string };
 
   createPlaylist: (name: string) => Promise<string>;
   renamePlaylist: (id: string, name: string) => Promise<void>;
@@ -80,10 +79,9 @@ export function useLibrary() {
   return v;
 }
 
-const isSeed = (p: Playlist | SeedPlaylist): p is SeedPlaylist => 'displayCount' in p;
-
 export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const { user, ready: authReady } = useAuth();
+  const { notify } = useToast();
   const userId = user?.id ?? null;
 
   const [userPlaylists, setUserPlaylists] = useState<Playlist[]>([]);
@@ -91,7 +89,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const [favorites, setFavorites] = useState<Track[]>([]);
   const [history, setHistory] = useState<{ track: Track; note: string }[]>([]);
   const [recents, setRecentsState] = useState<string[]>([]);
-  const [activePlaylistId, setActivePlaylist] = useState(SEED_PLAYLISTS[0].id);
+  const [activePlaylistId, setActivePlaylist] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
@@ -109,10 +107,13 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       setHistory(recent.map(({ track, note }) => ({ track, note })));
     } catch (err) {
       console.warn('Failed to sync library from Supabase:', err);
+      // Without this the screens render empty and indistinguishable from a
+      // genuinely empty account, which reads as data loss.
+      notify('Could not load your library. Check your connection.');
     } finally {
       setSyncing(false);
     }
-  }, []);
+  }, [notify]);
 
   // Search chips stay local; everything account-scoped comes from Supabase.
   useEffect(() => {
@@ -152,24 +153,18 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 
   const tracks = useMemo(() => {
     const m = new Map<string, Track>();
-    for (const t of [
-      ...SEED_TRACKS,
-      ...SEED_LIBRARY,
-      ...userTracks,
-      ...favorites,
-      ...history.map((h) => h.track),
-    ]) {
+    for (const t of [...userTracks, ...favorites, ...history.map((h) => h.track)]) {
       m.set(t.id, t);
     }
     return m;
   }, [userTracks, favorites, history]);
 
-  const playlists = useMemo<(Playlist | SeedPlaylist)[]>(
-    () => [...SEED_PLAYLISTS, ...userPlaylists],
-    [userPlaylists],
-  );
+  const playlists = userPlaylists;
 
-  const activePlaylist = playlists.find((p) => p.id === activePlaylistId) ?? playlists[0];
+  // Falls back to the first playlist so the screen shows *something* once one
+  // exists, but stays undefined while there are none.
+  const activePlaylist =
+    playlists.find((p) => p.id === activePlaylistId) ?? playlists[0];
 
   const favoriteIds = useMemo(() => new Set(favorites.map((t) => t.id)), [favorites]);
 
@@ -178,20 +173,15 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     [tracks],
   );
 
+  // Always computed. The seeded playlists used to carry hand-written figures
+  // — "24 tracks · 1h 42m · 312 saves" over a list of eight — because the
+  // mockup printed them. Nothing prints numbers it has not counted now.
   const statsOf = useCallback(
-    (p: Playlist | SeedPlaylist) => {
-      if (isSeed(p)) {
-        return {
-          count: String(p.displayCount),
-          runtime: p.displayRuntime,
-          saves: String(p.saves),
-        };
-      }
+    (p: Playlist) => {
       const list = tracksOf(p);
       return {
         count: String(list.length),
         runtime: runtime(list.reduce((n, t) => n + t.duration, 0)),
-        saves: '0',
       };
     },
     [tracksOf],
@@ -212,21 +202,21 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   );
 
   const renamePlaylist = useCallback(async (id: string, name: string) => {
-    if (isSeedId(id)) return;
     await dbRenamePlaylist(id, name);
     setUserPlaylists((prev) => prev.map((p) => (p.id === id ? { ...p, name } : p)));
   }, []);
 
   const deletePlaylist = useCallback(async (id: string) => {
-    if (isSeedId(id)) return;
     await dbDeletePlaylist(id);
     setUserPlaylists((prev) => prev.filter((p) => p.id !== id));
-    setActivePlaylist((cur) => (cur === id ? SEED_PLAYLISTS[0].id : cur));
+    // Back to "no selection" rather than to a seeded playlist that no longer
+    // exists; `activePlaylist` then falls through to whatever is left, or
+    // undefined if that was the last one.
+    setActivePlaylist((cur) => (cur === id ? null : cur));
   }, []);
 
   const addToPlaylist = useCallback(
     async (playlistId: string, track: Track) => {
-      if (isSeedId(playlistId)) return;
       const current = userPlaylists.find((p) => p.id === playlistId);
       if (!current || current.trackIds.includes(track.id)) {
         rememberTrackLocally(track);
@@ -244,7 +234,6 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   );
 
   const removeFromPlaylist = useCallback(async (playlistId: string, trackId: string) => {
-    if (isSeedId(playlistId)) return;
     await removeTrackFromPlaylist(playlistId, trackId);
     setUserPlaylists((prev) =>
       prev.map((p) =>
@@ -317,40 +306,20 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     if (userId) await loadRemote(userId);
   }, [userId, loadRemote]);
 
-  const mergedRecents = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const r of [...recents, ...SEED_RECENTS]) {
-      const key = r.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(r);
-      if (out.length === 5) break;
-    }
-    return out;
-  }, [recents]);
-
-  const library = useMemo(() => {
-    const favIds = new Set(favorites.map((t) => t.id));
-    const seeded = SEED_LIBRARY.filter((t) => !favIds.has(t.id));
-    return [...favorites, ...seeded];
-  }, [favorites]);
-
-  const displayHistory = useMemo(() => {
-    if (history.length > 0) return history;
-    return SEED_HISTORY.map(({ id, note }) => ({ track: tracks.get(id)!, note })).filter(
-      (h) => h.track,
-    );
-  }, [history, tracks]);
-
   const value = useMemo<LibraryValue>(
     () => ({
       playlists,
       tracks,
-      library,
+      // Favorites, and nothing else. `library` used to append six seeded tracks
+      // the account had never saved, which is why the Library tab was full on a
+      // fresh sign-in and the Profile "Songs" count started at six.
+      library: favorites,
       favoriteIds,
-      recents: mergedRecents,
-      history: displayHistory,
+      // No seeded chips merged in. An account that has not searched has no
+      // recent searches.
+      recents,
+      // No seeded fallback when the account has never played anything.
+      history,
       activePlaylistId,
       activePlaylist,
       ready,
@@ -374,10 +343,10 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     [
       playlists,
       tracks,
-      library,
+      favorites,
       favoriteIds,
-      mergedRecents,
-      displayHistory,
+      recents,
+      history,
       activePlaylistId,
       activePlaylist,
       ready,
@@ -400,8 +369,4 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   );
 
   return <Ctx value={value}>{children}</Ctx>;
-}
-
-function isSeedId(id: string) {
-  return SEED_PLAYLISTS.some((p) => p.id === id);
 }

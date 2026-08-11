@@ -109,6 +109,17 @@ export const G = {
   },
   /** Tab strip trough, darker than the bar above it. */
   tabsBar: { colors: [C.lunaBlueDeep, C.lunaBlueAbyss], ...DOWN },
+  /**
+   * Auth screens — the app bar's ramp stretched to a full screen, with the
+   * abyss stop added so the bottom does not wash out over that distance.
+   * These screens must NOT use `G.app`: that is the content-pane gradient and
+   * is near-white, which left the white display type at about 1.05:1.
+   */
+  auth: {
+    colors: ['#5d9ef5', C.lunaBlue, C.lunaBlueDeep, C.lunaBlueAbyss],
+    locations: [0, 0.3, 0.66, 1],
+    ...angle(168),
+  },
   /** Selected tab: bottom stop matches the content pane so they merge. */
   tabActive: {
     colors: ['#ffffff', '#f2f8ff', C.surface],

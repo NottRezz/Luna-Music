@@ -10,9 +10,9 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { SEED_TRACKS } from '@/constants/seed';
 import { useLibrary } from '@/providers/library';
-import { fromItunes, type Track } from '@/types/music';
+import { useToast } from '@/providers/toast';
+import { applePreview, fromItunes, type Track } from '@/types/music';
 
 type Source = { kind: string; name: string };
 
@@ -83,10 +83,13 @@ export function useVolume() {
 }
 
 /**
- * Seeded demo tracks are fictional and carry no audio. Rather than leave half
- * the UI dead, borrow a real preview from iTunes for the title so transport,
- * seeking and the meters are all exercisable. Display metadata stays the
- * mockup's. Resolved URLs are cached for the session.
+ * Most tracks arrive from a search and already carry their own `previewUrl`.
+ * This covers the ones that do not — a row restored from the `tracks` cache
+ * whose URL was never stored, or was dropped on read for failing the host check
+ * (LM-23). Resolved URLs are cached for the session.
+ *
+ * It used to matter far more: it existed so the fictional seeded demo tracks
+ * had something to play. Those are gone.
  */
 const previewCache = new Map<string, string | null>();
 /** Deduplicates concurrent lookups — a prefetch and a tap can race. */
@@ -117,9 +120,8 @@ function resolvePreview(track: Track): Promise<string | null> {
   if (pending) return pending;
 
   const p = lookup(`${track.title} ${track.artist}`)
-    // The artists are invented, so "Digital Rain SynthWave Pro" matches nothing
-    // and the track silently refused to play. The title alone almost always
-    // finds something.
+    // Title and artist together can miss where the title alone matches, so fall
+    // back rather than give up.
     .then((url) => url ?? lookup(track.title))
     .then((url) => {
       if (!url) console.warn(`No preview found for "${track.title}"`);
@@ -136,7 +138,7 @@ function lookup(term: string): Promise<string | null> {
   return getJson(
     `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&limit=1`,
   )
-    .then((data) => (data.results?.[0]?.previewUrl as string | undefined) ?? null)
+    .then((data) => applePreview(data.results?.[0]?.previewUrl as string | undefined) ?? null)
     .catch(() => null);
 }
 
@@ -144,12 +146,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const player = useAudioPlayer(null, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
   const { isFavorite, toggleFavorite, rememberPlay } = useLibrary();
+  const { notify } = useToast();
 
-  // Seeded so the dock is populated on first launch, as it is in the mockup.
-  // Nothing is loaded or played until the user asks for it.
-  const [queue, setQueue] = useState<Track[]>(SEED_TRACKS);
-  const [index, setIndex] = useState(1);
-  const [source, setSource] = useState<Source>({ kind: 'Playing from playlist', name: 'Midnight Echoes' });
+  // Empty until something is played. This used to start as the mockup's eight
+  // demo tracks with index 1, so a brand new account launched into a dock
+  // already showing "Digital Rain" by an artist that does not exist. The dock
+  // renders nothing while `track` is undefined.
+  const [queue, setQueue] = useState<Track[]>([]);
+  const [index, setIndex] = useState(0);
+  const [source, setSource] = useState<Source>({ kind: 'Not playing', name: '—' });
   const [loading, setLoading] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState(false);
@@ -179,9 +184,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     (v: boolean) => {
       if (!track) return;
       if (v === isFavorite(track.id)) return;
-      void toggleFavorite(track).catch((err) => console.warn('toggleFavorite failed:', err));
+      void toggleFavorite(track).catch((err) => {
+        console.warn('toggleFavorite failed:', err);
+        // The heart has already flipped optimistically, so silence here meant
+        // the like looked saved until the next launch proved otherwise.
+        notify(v ? 'Could not save that like.' : 'Could not remove that like.');
+      });
     },
-    [track, isFavorite, toggleFavorite],
+    [track, isFavorite, toggleFavorite, notify],
   );
 
   /* --- Volume ------------------------------------------------ */
@@ -203,28 +213,53 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
 
+  /**
+   * Load a track and, by default, start it.
+   *
+   * LM-7 was here. Both failure exits used to `return` silently: the transport
+   * stayed lit, `loadedId` kept pointing at the *previous* track, and the only
+   * trace was a `console.warn`. So the app looked like it was playing and was
+   * not — and because `loadedId` was stale, pressing play again re-loaded the
+   * old track rather than retrying this one.
+   *
+   * Now both exits say so and clear `loadedId`, which is what makes the next
+   * press a real retry.
+   */
   const load = useCallback(
     async (t: Track, autoplay = true) => {
       const token = ++loadToken.current;
       setLoading(true);
       try {
         const uri = await resolvePreview(t);
+        // A newer load won. Not a failure — say nothing, and leave the state
+        // belonging to whichever track is actually current.
         if (token !== loadToken.current) return;
-        if (!uri) return;
 
-        player.replace({ uri: uri.replace(/^http:\/\//i, 'https://') });
+        if (!uri) {
+          loadedId.current = null;
+          notify(`No audio found for “${t.title}”.`);
+          return;
+        }
+
+        // Already normalised and host-checked by applePreview, at every source:
+        // the iTunes lookup, a search result, and a row read back out of the
+        // shared tracks cache. Nothing reaches the player unvetted (LM-23).
+        player.replace({ uri });
         // `replace` swaps the underlying source, so re-assert the level rather
         // than trusting it to carry over.
         player.volume = levelRef.current;
         loadedId.current = t.id;
         if (autoplay) player.play();
       } catch (err) {
+        if (token !== loadToken.current) return;
+        loadedId.current = null;
         console.warn('Failed to load track:', err);
+        notify(`Could not play “${t.title}”. Check your connection.`);
       } finally {
         if (token === loadToken.current) setLoading(false);
       }
     },
-    [player],
+    [player, notify],
   );
 
   const play = useCallback(
@@ -284,15 +319,43 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (queue.length > 1) void resolvePreview(queue[(index + 1) % queue.length]);
   }, [queue, index]);
 
-  // Advance at the end of a preview. `repeat` restarts the same track instead.
+  /**
+   * Latest transport state, for the end-of-track effect below to read without
+   * subscribing to. See the comment there for why it cannot depend on these.
+   */
+  const stepRef = useRef(step);
+  const repeatRef = useRef(repeat);
   useEffect(() => {
-    if (!status.didJustFinish) return;
-    if (repeat) {
+    stepRef.current = step;
+    repeatRef.current = repeat;
+  });
+
+  /** Whether the current `didJustFinish` has already been acted on. */
+  const handledFinish = useRef(false);
+
+  // Advance at the end of a preview. `repeat` restarts the same track instead.
+  //
+  // `didJustFinish` is a level, not an edge: it stays true on the status object
+  // until the next status arrives. So this must react to the *transition* only.
+  // Depending on `step` — which is recreated whenever `index` changes, i.e.
+  // immediately after this effect advances — re-ran the effect while the flag
+  // was still true and skipped a second track. `repeat` had the same problem
+  // whenever it was toggled mid-track. Both are read through refs instead, and
+  // the latch covers the case where the flag never falls between two finishes.
+  useEffect(() => {
+    if (!status.didJustFinish) {
+      handledFinish.current = false;
+      return;
+    }
+    if (handledFinish.current) return;
+    handledFinish.current = true;
+
+    if (repeatRef.current) {
       player.seekTo(0).then(() => player.play()).catch(() => {});
     } else {
-      step(1);
+      stepRef.current(1);
     }
-  }, [status.didJustFinish, repeat, player, step]);
+  }, [status.didJustFinish, player]);
 
   const value = useMemo<PlayerValue>(
     () => ({
